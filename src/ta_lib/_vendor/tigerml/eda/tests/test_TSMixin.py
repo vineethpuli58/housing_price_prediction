@@ -1,10 +1,9 @@
-import os
-from datetime import datetime, timedelta
-
 import holoviews
 import numpy as np
+import os
 import pandas as pd
 import pytest
+from datetime import datetime, timedelta
 from hypothesis import HealthCheck, given, settings
 from hypothesis.extra.pandas import columns, data_frames, range_indexes
 from hypothesis.strategies import (
@@ -17,7 +16,6 @@ from hypothesis.strategies import (
     text,
     tuples,
 )
-
 from tigerml.eda.Analyser import TSAnalyser
 from tigerml.eda.time_series import SegmentedTSReport, TSReport
 

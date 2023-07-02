@@ -1,9 +1,8 @@
-import os
-import pathlib
-
 import holoviews as hv
 import matplotlib
+import os
 import pandas as pd
+import pathlib
 import pytest
 from hypothesis import given, settings
 from hypothesis.strategies import composite, floats, integers, sampled_from

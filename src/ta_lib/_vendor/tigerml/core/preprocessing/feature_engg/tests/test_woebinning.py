@@ -1,14 +1,12 @@
-import warnings
-
 import numpy as np
 import pandas as pd
 import pytest
+import warnings
 from sklearn.utils._testing import (
     assert_array_almost_equal,
     assert_array_equal,
     assert_warns_message,
 )
-
 from tigerml.feature_engg import WoeBinningTransformer
 
 X = pd.DataFrame(

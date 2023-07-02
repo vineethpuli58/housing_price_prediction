@@ -11,7 +11,7 @@ from invoke import Collection, UnexpectedExit, task
 
 # Some default values
 PACKAGE_NAME = "ta_lib"
-ENV_PREFIX = "capstone"
+ENV_PREFIX = "ta-lib"
 ENV_PREFIX_PYSPARK = "ta-lib-pyspark"
 NUM_RETRIES = 10
 SLEEP_TIME = 1
@@ -28,6 +28,11 @@ CONDA_ENV_FOLDER = op.join(HERE, "deploy", "conda_envs")
 PYSPARK_ENV_FOLDER = op.join(HERE, "deploy", "pyspark")
 NOTEBOOK_FOLDER = op.join(HERE, "notebooks", "tests")
 
+TESTS_USECASE = [
+    "core",
+    "ebo",
+]
+
 _TASK_COLLECTIONS = []
 
 addon_dict = {
@@ -35,7 +40,6 @@ addon_dict = {
     "formatting": "addon-code_format",
     "extras": "addon-extras",
     "jupyter": "addon-jupyter",
-    "pyspark": "addon-pyspark",
     "testing": "addon-testing",
     "ts": "addon-ts"
 }
@@ -68,9 +72,9 @@ def _clean_rmtree(path):
             shutil.rmtree(path)
         except Exception as e:
             time.sleep(SLEEP_TIME)
-            print(f"{path} Remove failed with error {e}:: Retrying ..")
+            print(f""" "{path}" Remove failed with error {e}:: Retrying ..""")
             continue
-        print(f"{path} Remove Success")
+        print(f""" "{path}" Remove Success""")
         break
 
 
@@ -112,8 +116,8 @@ def check_setup_prerequisites(c):
     _failed = []
 
     # check the folder has no spaces in the path
-    if " " in HERE:
-        raise RuntimeError("The path to the current folder has whitespaces in it.")
+    # if " " in HERE:
+    #     raise RuntimeError("The path to the current folder has whitespaces in it.")
 
     for binary in ["git", "conda"]:
         try:
@@ -171,12 +175,12 @@ def setup_env_legacy(c, platform=PLATFORM, env=DEV_ENV, force=False):
     )
     req_flag = True
     if not op.isfile(env_file):
-        raise ValueError(f"The conda env file is not found : {env_file}")
+        raise ValueError(f"""The conda env file is not found : "{env_file}" """)
     if not op.isfile(req_file):
         req_flag = False
     env_name = _get_env_name(platform, env)
 
-    out = c.run(f"conda create --name {env_name} --file {env_file}  {force_flag} -y")
+    out = c.run(f"""conda create --name {env_name} --file "{env_file}"  {force_flag} -y""")
 
     # check for jupyterlab
     with open(env_file, "r") as fp:
@@ -192,10 +196,10 @@ def setup_env_legacy(c, platform=PLATFORM, env=DEV_ENV, force=False):
 
         # install pip requirements
         if req_flag:
-            c.run(f"pip install -r {req_file} --no-deps")
+            c.run(f"""python -m pip install -r "{req_file}" --no-deps""")
 
         # install the current package
-        c.run(f"pip install -e {HERE}")
+        c.run(f"""python -m pip install -e "{HERE}" """)
 
         is_jupyter = False
         if "jupyterlab-" in env_cfg:
@@ -218,42 +222,7 @@ def setup_env_legacy(c, platform=PLATFORM, env=DEV_ENV, force=False):
     os.makedirs(op.join(HERE, "mlruns"), exist_ok=True)
     os.makedirs(op.join(HERE, "data"), exist_ok=True)
 
-
-@task(
-    help={
-        "platform": (
-            "Specifies the platform spec. Must be of the form "
-            "``{windows|linux}-{cpu|gpu}-{64|32}``"
-        ),
-        "env": "Specifies the enviroment type. Must be one of ``{dev|test|run}``",
-        "force": "If ``True``, any pre-existing environment with the same name will be overwritten",
-    }
-)
-def setup_env(c, platform=PLATFORM, env=DEV_ENV, force=False):
-    """Help in setup of a new development environment.
-
-    Creates a new conda environment with the dependencies specified in the file
-    ``deploy/conda_envs/{platform}-{env}.yml``. To overwrite an existing environment with the
-    same name, set the flag ``force`` to ``True``.
-    """
-
-    # run pre-checks
-    check_setup_prerequisites(c)
-
-    # FIXME: We might want to split the env.yml file into multiple
-    # files: run.yml, build.yml, test.yml and support combining them for
-    # different environments
-    force_flag = "" if not force else "--force"
-
-    env_file = op.abspath(op.join(CONDA_ENV_FOLDER, f"{platform}-{env}.yml"))
-
-    if not op.isfile(env_file):
-        raise ValueError(f"The conda env file is not found : {env_file}")
-
-    env_name = _get_env_name(env)
-
-    out = c.run(f"conda env create --name {env_name} --file {env_file}  {force_flag}")
-
+def _jupyterlab_install(c, env_name, env_file):
     # check for jupyterlab
     with open(env_file, "r") as fp:
         env_cfg = fp.read()
@@ -263,11 +232,7 @@ def setup_env(c, platform=PLATFORM, env=DEV_ENV, force=False):
     with open(extensions_file) as fp:
         extensions = yaml.safe_load(fp)
 
-    # install the code-template modules
     with py_env(c, env_name):
-
-        # install the current package
-        c.run(f"pip install -e {HERE}")
 
         is_jupyter = False
         if "jupyterlab-" in env_cfg:
@@ -283,6 +248,25 @@ def setup_env(c, platform=PLATFORM, env=DEV_ENV, force=False):
 
             out = c.run("jupyter lab build")
 
+def _setup_env_common(c, env_name, platform=PLATFORM, env=DEV_ENV, force=False):
+    force_flag = "" if not force else "--force"
+
+    env_file = op.abspath(op.join(CONDA_ENV_FOLDER, f"ct-core-{env}.yml"))
+
+    if not op.isfile(env_file):
+        raise ValueError(f"""The conda env file is not found : "{env_file}" """)
+
+    out = c.run(f"""conda env create --name {env_name} --file "{env_file}"  {force_flag}""")
+
+
+    # install the code-template modules
+    with py_env(c, env_name):
+
+        # install the current package
+        c.run(f"""python -m pip install -e "{HERE}" """)
+
+    _jupyterlab_install(c, env_name, env_file)
+
     # FIXME: create default folders that are expected. these need to be handled
     # when convering to cookiecutter templates
     os.makedirs(op.join(HERE, "logs"), exist_ok=True)
@@ -290,12 +274,55 @@ def setup_env(c, platform=PLATFORM, env=DEV_ENV, force=False):
     os.makedirs(op.join(HERE, "mlruns"), exist_ok=True)
     os.makedirs(op.join(HERE, "data"), exist_ok=True)
 
+@task(
+    help={
+        "platform": (
+            "Specifies the platform spec. Must be of the form "
+            "``ct-core``"
+        ),
+        "env": "Specifies the enviroment type. Must be one of ``{dev|test|run}``",
+        "force": "If ``True``, any pre-existing environment with the same name will be overwritten",
+    }
+)
+def setup_env(c, platform=PLATFORM, env=DEV_ENV, force=False, usecase=None):
+    """Help in setup of a new development environment.
+
+    Creates a new conda environment with the dependencies specified in the file
+    ``deploy/conda_envs/ct-core-{env}.yml``. To overwrite an existing environment with the
+    same name, set the flag ``force`` to ``True``.
+    """
+
+    # run pre-checks
+    check_setup_prerequisites(c)
+
+    # FIXME: We might want to split the env.yml file into multiple
+    # files: run.yml, build.yml, test.yml and support combining them for
+    # different environments
+
+    usecase_file = None
+    if usecase:
+        if usecase=="tpo":
+            usecase_file = op.abspath(op.join(CONDA_ENV_FOLDER, f"ct-tpo-{env}.yml"))
+        elif usecase=="mmx":
+            usecase_file = op.abspath(op.join(CONDA_ENV_FOLDER, f"ct-mmx-{env}.yml"))
+        elif usecase=="ebo":
+            usecase_file = op.abspath(op.join(CONDA_ENV_FOLDER, f"ct-ebo-{env}.yml"))
+        else:
+            raise FileNotFoundError(
+                "This is not a valid usecase. Valid usecases -> tpo or mmx or ebo")
+
+    env_name = _get_env_name(env)
+
+    _setup_env_common(c, env_name, platform=platform, env=env, force=force)
+
+    if usecase:
+        out_upd = c.run(f"""conda env update --name {env_name} --file "{usecase_file}" """)
 
 @task(
     help={
         "platform": (
             "Specifies the platform spec. Must be of the form "
-            "``{windows|linux}-{cpu|gpu}-{64|32}``"
+            "``ct-core``"
         ),
         "env": "Specifies the enviroment type. Must be one of ``{dev|test|run}``",
         "force": "If ``True``, any pre-existing environment with the same name will be overwritten",
@@ -317,61 +344,27 @@ def setup_env_pyspark(c, platform=PLATFORM, env=DEV_ENV, force=True):
     # different environments
     force_flag = "" if not force else "--force"
 
-    env_file = op.abspath(op.join(PYSPARK_ENV_FOLDER, f"{env}.yml"))
-    req_file = op.abspath(
-        op.join(
-            PYSPARK_ENV_FOLDER,
-            f"requirements-{env}.txt"
-        )
-    )
-    req_flag = True
+    env_file = op.abspath(op.join(CONDA_ENV_FOLDER, f"ct-core-{env}.yml"))
+    usecase_file = op.abspath(op.join(CONDA_ENV_FOLDER, f"ct-pyspark-{env}.yml"))
+
+    # req_file = op.abspath(
+    #     op.join(
+    #         PYSPARK_ENV_FOLDER,
+    #         f"requirements-{env}.txt"
+    #     )
+    # )
+    # req_flag = True
     if not op.isfile(env_file):
-        raise ValueError(f"The conda env file is not found : {env_file}")
-    if not op.isfile(req_file):
-        req_flag = False
+        raise ValueError(f"""The conda env file is not found : "{env_file}" """)
+    # if not op.isfile(req_file):
+    #     req_flag = False
     env_name = _get_env_name_pyspark(env)
-    print(f"env_name is {env_name} \n env_file is {env_file}")  # Todo: Delete this
-    # out = c.run(f"conda env create --name {env_name} -f {env_file}  {force_flag}")
-    out = c.run(f"conda env create -f {env_file}  {force_flag}")
+    # print(f"env_name is {env_name} \n env_file is {env_file}")  # TODO: Delete this
 
-    # check for jupyterlab
-    with open(env_file, "r") as fp:
-        env_cfg = fp.read()
+    _setup_env_common(c, env_name, platform=platform, env=env, force=force)
 
-    # installing jupyter lab extensions
-    extensions_file = op.abspath(op.join(CONDA_ENV_FOLDER, "jupyterlab_extensions.yml"))
-    with open(extensions_file) as fp:
-        extensions = yaml.safe_load(fp)
-
-    # install the code-template modules
-    with py_env(c, env_name):
-
-        # install pip requirements
-        if req_flag:
-            c.run(f"pip install -r {req_file} --no-deps")
-
-        # install the current package
-        c.run(
-            f"pip install -e {HERE}"
-        )  # Todo: Alternative is a separate src folder for pyspark modules only
-
-        is_jupyter = False
-        if "jupyterlab-" in env_cfg:
-            is_jupyter = True
-
-        if is_jupyter:
-            # install jupyterlab extensions
-            for extension in extensions["extensions"]:
-                extn_name = "@{channel}/{name}@{version}".format(**extension)
-                c.run(f"jupyter labextension install --no-build {extn_name}",)
-
-            out = c.run("jupyter lab build")
-
-    # FIXME: create default folders that are expected. these need to be handled
-    # when convering to cookiecutter templates
-    os.makedirs(op.join(HERE, "logs"), exist_ok=True)
-    os.makedirs(op.join(HERE, "mlruns"), exist_ok=True)
-    os.makedirs(op.join(HERE, "data"), exist_ok=True)
+    out_upd = c.run(f"""conda env update --name {env_name} --file "{usecase_file}" """)
+    # out = c.run(f"conda env create -f {env_file}  {force_flag}")
 
 
 def _addon_file_paths(platform, env, addon_list):
@@ -386,7 +379,7 @@ def _addon_file_paths(platform, env, addon_list):
         elif os.path.exists(addon_path_without_platform):
             addon_file_list.append(addon_path_without_platform)
         else:
-            raise FileNotFoundError(f"The file for {addon} doesn't exist in {CONDA_ENV_FOLDER} folder")
+            raise FileNotFoundError(f"""The file for {addon} doesn't exist in "{CONDA_ENV_FOLDER}" folder""")
 
 
     return addon_file_list
@@ -394,7 +387,7 @@ def _addon_file_paths(platform, env, addon_list):
 def _addon_update_env(c, addon_file, env_name):
     with py_env(c, env_name):
         c.run(
-            f"conda env update --name {env_name} --file {addon_file}"
+            f"""conda env update --name {env_name} --file "{addon_file}" """
         )
     if "documentation" in addon_file:
         os.makedirs(op.join(HERE, "docs/build"), exist_ok=True)
@@ -406,19 +399,19 @@ def _addon_update_env(c, addon_file, env_name):
         with open(extensions_file) as fp:
             extensions = yaml.safe_load(fp)
 
-        for extension in extensions["extensions"]:
-            extn_name = "@{channel}/{name}@{version}".format(**extension)
-            c.run(f"jupyter labextension install --no-build {extn_name}",)
+        with py_env(c, env_name):
+            for extension in extensions["extensions"]:
+                extn_name = "@{channel}/{name}@{version}".format(**extension)
+                c.run(f"jupyter labextension install --no-build {extn_name}",)
 
-        out = c.run("jupyter lab build")
+            out = c.run("jupyter lab build")
 
 
     if "extras" in addon_file:
         os.makedirs(op.join(HERE, "mlruns"), exist_ok=True)
 
-@task(name="setup_addon")
-def setup_addon(
-    c,
+def _setup_addon_common(c,
+    env_name,
     platform=PLATFORM,
     env=DEV_ENV,
     all=False,
@@ -428,15 +421,7 @@ def setup_addon(
     jupyter=False,
     extras=False,
     ts=False,
-    pyspark=False
-):
-    """Installs add on packages related to documentation, testing or code-formatting.
-
-    Dependencies related to documentation, testing or code-formatting can be installed on demand.
-    By Specifying `--documentation`, documentation related packages get installed. Similarly to install testing
-    or formatting related packages, flags `--testing` `formatting` will do the needful installations.
-    """
-    env_name = _get_env_name(env)
+    ):
 
     addon_list = []
     if documentation or all:
@@ -447,12 +432,10 @@ def setup_addon(
         addon_list.append(addon_dict["formatting"])
     if jupyter or all:
         addon_list.append(addon_dict["jupyter"])
-    if extras or all:
+    if extras:
         addon_list.append(addon_dict["extras"])
     if ts or all:
         addon_list.append(addon_dict["ts"])
-    if pyspark or all:
-        addon_list.append(addon_dict["pyspark"])
 
     addon_file_list = _addon_file_paths(platform=platform, env=env, addon_list=addon_list)
 
@@ -525,20 +508,86 @@ def setup_addon(
     #             f"conda env update --name {ENV_PREFIX}-{DEV_ENV} --file {addons_pyspark}"
     #         )
 
+@task(name="setup_addon")
+def setup_addon(
+    c,
+    platform=PLATFORM,
+    env=DEV_ENV,
+    all=False,
+    documentation=False,
+    testing=False,
+    formatting=False,
+    jupyter=False,
+    extras=False,
+    ts=False,
+):
+    """Installs add on packages related to documentation, testing or code-formatting.
+
+    Dependencies related to documentation, testing or code-formatting can be installed on demand.
+    By Specifying `--documentation`, documentation related packages get installed. Similarly to install testing
+    or formatting related packages, flags `--testing` `formatting` will do the needful installations.
+    """
+    env_name = _get_env_name(env)
+
+    _setup_addon_common(c,
+    env_name,
+    platform=platform,
+    env=env,
+    all=all,
+    documentation=documentation,
+    testing=testing,
+    formatting=formatting,
+    jupyter=jupyter,
+    extras=extras,
+    ts=ts,)
+
+
+@task(name="setup_addon_pyspark")
+def setup_addon_pyspark(
+    c,
+    platform=PLATFORM,
+    env=DEV_ENV,
+    all=False,
+    documentation=False,
+    testing=False,
+    formatting=False,
+    jupyter=False,
+    extras=False,
+    ts=False,
+):
+    """Installs add on packages related to documentation, testing or code-formatting for pyspark envs.
+
+    Dependencies related to documentation, testing or code-formatting can be installed on demand.
+    By Specifying `--documentation`, documentation related packages get installed. Similarly to install testing
+    or formatting related packages, flags `--testing` `formatting` will do the needful installations.
+    """
+    env_name = _get_env_name_pyspark(env)
+
+    _setup_addon_common(c,
+    env_name,
+    platform=platform,
+    env=env,
+    all=all,
+    documentation=documentation,
+    testing=testing,
+    formatting=formatting,
+    jupyter=jupyter,
+    extras=extras,
+    ts=ts,)
 
 @task(name="format-code")
 def format_code(c, platform=PLATFORM, env=DEV_ENV, path="."):
     env_name = _get_env_name(env)
     with py_env(c, env_name):
-        c.run(f"black {path}", warn=True)
-        c.run(f"isort -rc {path}")
+        c.run(f"""black "{path}" """, warn=True)
+        c.run(f"""isort -rc "{path}" """)
 
 
 @task(name="refresh-version")
 def refresh_version(c, platform=PLATFORM, env=DEV_ENV):
     env_name = _get_env_name(env)
     with py_env(c, env_name):
-        res = c.run(f"python {HERE}/setup.py --version")
+        res = c.run(f"""python "{HERE}"/setup.py --version""")
     return res.stdout
 
 
@@ -568,7 +617,7 @@ def run_notebook(
     env_name = _get_env_name(env)
     with py_env(c, env_name):
         res = c.run(
-            f"python {NOTEBOOK_FOLDER}/utils.py {template} {notebookid} {timeout} {refresh}"
+            f"""python "{NOTEBOOK_FOLDER}"/utils.py {template} {notebookid} {timeout} {refresh}"""
         )
     return res.stdout
 
@@ -596,6 +645,8 @@ def _build_docker_image(c):
             tag = "ct-tpo-py"
         elif template == "rtm-py":
             tag = "ct-rtm-py"
+        elif template == "ebo-py":
+            tag = "ct-ebo-py"
         else:
             raise ValueError(f"Unknown template : {template}")
         shutil.copytree(op.join(HERE, "deploy"), op.join(tempdir, "deploy"))
@@ -606,14 +657,14 @@ def _build_docker_image(c):
         shutil.copyfile(op.join(HERE, "setup.py"), op.join(tempdir, "setup.py"))
         shutil.copyfile(op.join(HERE, "setup.cfg"), op.join(tempdir, "setup.cfg"))
         build_context = tempdir
-        c.run(f"docker build -f {docker_file} -t {tag} {build_context}")
+        c.run(f"""docker build -f "{docker_file}" -t {tag} "{build_context}" """)
 
 
 @task(
     help={
         "platform": (
             "Specifies the platform spec. Must be of the form "
-            "``{windows|linux}-{cpu|gpu}-{64|32}``"
+            "``ct-full-{windows|linux}-{cpu|gpu}-{64|32}``"
         ),
         "force": "If ``True``, any pre-existing environment with the same name will be overwritten",
     }
@@ -629,28 +680,28 @@ def setup_ci_env(c, platform=PLATFORM, force=False):
     req_file = ""
     force_flag = "" if not force else "--force"
     env_file = op.abspath(op.join(CONDA_ENV_FOLDER, f"ct-full-{platform}-{env}.yml"))
-    # req_file = op.abspath(
-    #     op.join(CONDA_ENV_FOLDER, f"requirements-{platform}-{env}.txt")
-    # )
+    req_file = op.abspath(
+        op.join(CONDA_ENV_FOLDER, "ext-tiger-libs-req.txt")
+    )
 
     req_flag = True
     if not op.isfile(env_file):
-        raise ValueError(f"The conda env file is not found : {env_file}")
+        raise ValueError(f"""The conda env file is not found : "{env_file}" """)
     if not op.isfile(req_file):
         req_flag = False
     env_name = _get_env_name(env)
 
-    out = c.run(f"conda env create --name {env_name} --file {env_file}  {force_flag}")
+    out = c.run(f"""conda env create --name {env_name} --file "{env_file}"  {force_flag}""")
 
     # install the code-template modules
     with py_env(c, env_name):
 
         # install pip requirements
         if req_flag:
-            c.run(f"pip install -r {req_file} --no-deps")
+            c.run(f"""python -m pip install -r "{req_file}" --no-deps""")
 
         # install the current package
-        c.run(f"pip install -e {HERE}")
+        c.run(f"""python -m pip install -e "{HERE}" """)
 
 
 _create_task_collection(
@@ -661,6 +712,7 @@ _create_task_collection(
     refresh_version,
     run_notebook,
     setup_addon,
+    setup_addon_pyspark,
     setup_info,
     _build_docker_image,
     setup_ci_env,
@@ -676,7 +728,7 @@ def run_qc_test(c, platform=PLATFORM, env=DEV_ENV, fail=False):
     with py_env(c, env_name):
         # This runs flake8, flake8-black, flake8-isort, flake8-bandit,
         # flake8-docstring
-        c.run(f"python -m flake8 {SOURCE_FOLDER}", warn=(not fail))
+        c.run(f"""python -m flake8 "{SOURCE_FOLDER}" """, warn=(not fail))
 
 
 @task(name="unittest")
@@ -684,8 +736,10 @@ def run_unit_tests(c, platform=PLATFORM, env=DEV_ENV, markers=None):
     env_name = _get_env_name(env)
     markers = "" if markers is None else f"-m {markers}"
     with py_env(c, env_name):
-        # FIXME: Add others, flake9-black, etc
-        c.run(f"pytest -v {TESTS_FOLDER} {markers}")
+        for usecase in TESTS_USECASE:
+            # FIXME: Add others, flake9-black, etc
+            test_usecase = op.join(TESTS_FOLDER, usecase)
+            c.run(f"""pytest -v "{test_usecase}" {markers}""")
 
 
 @task(name="vuln")
@@ -708,7 +762,7 @@ def run_all_tests(c):
     validate_env(c)
 
 def _get_expected_env_list(env_files):
-    expected_list = ["ta-lib==1.1.1"]
+    expected_list = ["ta-lib==1.1.2"]
     for env_file in env_files:
         with open(env_file) as fp:
             env_cfg = yaml.safe_load(fp)
@@ -767,13 +821,13 @@ def validate_env(
     jupyter=False,
     extras=False,
     ts=False,
-    pyspark=False
+    usecase=None
     ):
 
     env_name = _get_env_name(env)
 
     # for core packages
-    env_files = [op.join(CONDA_ENV_FOLDER, f"{platform}-{env}.yml")]
+    env_files = [op.join(CONDA_ENV_FOLDER, f"ct-core-{env}.yml")]
 
     # addon files check
     addon_list = []
@@ -789,12 +843,18 @@ def validate_env(
         addon_list.append(addon_dict["extras"])
     if ts or all:
         addon_list.append(addon_dict["ts"])
-    if pyspark or all:
-        addon_list.append(addon_dict["pyspark"])
 
     addon_file_list = _addon_file_paths(platform=platform, env=env, addon_list=addon_list)
 
     env_files.extend(addon_file_list)
+
+    if usecase:
+        if usecase in ["tpo", "mmx", "ebo"]:
+            usecase_file = op.abspath(op.join(CONDA_ENV_FOLDER, f"ct-{usecase}-{env}.yml"))
+            env_files.append(usecase_file)
+        else:
+            raise FileNotFoundError(
+                "This is not a valid usecase. Valid usecases -> tpo or mmx or ebo")
 
     # expected and installed packages list
     expected_list = _get_expected_env_list(env_files)
@@ -869,24 +929,11 @@ def validate_env(
     #         ["%s==%s" % (i.key.lower(), i.version) for i in installed_packages]
     #     )
 
-@task(name="radon")
-def start_radon(
-    c, platform=PLATFORM, env=DEV_ENV,metrics={'cc','raw','mi','hal'}):
-    env_name = _get_env_name(env)
-    with py_env(c, env_name):
-        print(
-            f"{'--'*20} \n Running radon with {env_name} environment \n {'--'*20}"
-        )
-        for i in metrics:
-            c.run(
-                f"radon  {i} ./notebooks/housing_reference  --include-ipynb"
-                )
 
 
 
 _create_task_collection(
     "test",
-    start_radon,
     run_qc_test,
     run_vulnerability_test,
     run_unit_tests,
@@ -916,7 +963,7 @@ def build_docs(c, platform=PLATFORM, env=DEV_ENV, regen_api=True, update_credits
             os.makedirs(credits_path, exist_ok=True)
             authors_path = op.join(HERE, "docs")
             token = os.environ["GITHUB_OAUTH_TOKEN"]
-            c.run(f"python {authors_path}/generate_authors_table.py {token} {token}")
+            c.run(f"""python "{authors_path}"/generate_authors_table.py {token} {token}""")
         c.run(
             "cd docs/source && sphinx-build -T -E -W --keep-going -b html -d ../build/doctrees  . ../build/html"
         )
@@ -942,19 +989,6 @@ def start_jupyterlab(
             f"jupyter lab --ip {ip} --port {port} --NotebookApp.token={token} "
             f"--NotebookApp.password={password} --no-browser"
         )
-@task(name="radon")
-def start_radon(
-    c, platform=PLATFORM, env=DEV_ENV,metrics={'cc','raw','mi','hal'}):
-    env_name = _get_env_name(env)
-    with py_env(c, env_name):
-        print(
-            f"{'--'*20} \n Running radon with {env_name} environment \n {'--'*20}"
-        )
-        for i in metrics:
-            c.run(
-                f"radon  {i} ./notebooks/housing_reference  --include-ipynb"
-                )
-
 
 
 @task(name="jupyterlab_pyspark")
@@ -981,8 +1015,8 @@ def start_tracker_ui(c, platform=PLATFORM, env=DEV_ENV, port=8082):
     # if scalability is needed, use a postgresql server
     with py_env(c, env_name):
         c.run(
-            f"mlflow server --port {port} --default-artifact-root {HERE}/mlruns "
-            f"--backend-store-uri sqlite:///{HERE}/mlruns/mlflow.db "
+            f"""mlflow server --port {port} --default-artifact-root "{HERE}"/mlruns """
+            f"""--backend-store-uri sqlite:///"{HERE}"/mlruns/mlflow.db """
             f"--workers 1"
         )
 
@@ -990,6 +1024,7 @@ def start_tracker_ui(c, platform=PLATFORM, env=DEV_ENV, port=8082):
 @task(name="docs")
 def start_docs_server(c, ip="127.0.0.1", port=8081):
     # FIXME: run as a daemon and support start/stop using pidfile
+    print(f"Serving HTTP on {ip} port {port} (http://{ip}:{port}/)")
     c.run(
         f"python -m http.server --bind 127.0.0.1 " f"--directory docs/build/html {port}"
     )
@@ -1001,12 +1036,11 @@ def start_ipython_shell(c, platform=PLATFORM, env=DEV_ENV):
     # FIXME: run as a daemon and support start/stop using pidfile
     startup_script = op.join(HERE, "deploy", "ipython", "default_startup.py")
     with py_env(c, env_name):
-        c.run(f"ipython -i {startup_script}")
+        c.run(f"""ipython -i "{startup_script}" """)
 
 
 _create_task_collection(
     "launch",
-    start_radon,
     start_jupyterlab,
     start_jupyterlab_pyspark,
     start_tracker_ui,

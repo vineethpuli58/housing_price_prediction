@@ -35,3 +35,5 @@ Feature transformations
 - If there is one dominant level, we can use binary encoding.
 - This will go into production code
 
+
+This should be a rich section describing all the features engineered in the modeling process.

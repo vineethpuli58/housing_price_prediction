@@ -1,19 +1,53 @@
 import numpy as np
 import pandas as pd
-from sklearn.datasets import load_boston, load_breast_cancer, load_iris
-from hypothesis import given, settings
-from hypothesis.extra.pandas import columns, data_frames, range_indexes, column
-from hypothesis.strategies import dates, floats, integers, booleans, tuples, sampled_from, composite, data, lists
 import pytest
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, DataType, IntegerType, StringType, TimestampType, LongType, FloatType, StructField, Row
-from pyspark.ml.regression import LinearRegression
+from hypothesis import given, settings
+from hypothesis.extra.pandas import column, columns, data_frames, range_indexes
+from hypothesis.strategies import (
+    booleans,
+    composite,
+    data,
+    dates,
+    floats,
+    integers,
+    lists,
+    sampled_from,
+    tuples,
+)
 from pyspark.ml.classification import LogisticRegression
 from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.regression import LinearRegression
+from pyspark.sql import SparkSession
+from pyspark.sql.types import (
+    DataType,
+    FloatType,
+    IntegerType,
+    LongType,
+    Row,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
+)
+from sklearn.datasets import load_boston, load_breast_cancer, load_iris
 from tigerml.pyspark.core import dp
-from tigerml.pyspark.model_eval import get_regression_metrics, get_binary_classification_metrics, RegressionReport, ClassificationReport
-from tigerml.pyspark.model_eval.model_eval import wmape, mape, exp_var, get_classification_scores
-from tigerml.pyspark.core.dp import list_numerical_columns, list_categorical_columns
+from tigerml.pyspark.core.dp import (
+    list_categorical_columns,
+    list_numerical_columns,
+)
+from tigerml.pyspark.model_eval import (
+    ClassificationReport,
+    RegressionReport,
+    get_binary_classification_metrics,
+    get_regression_metrics,
+)
+from tigerml.pyspark.model_eval.model_eval import (
+    exp_var,
+    get_classification_scores,
+    mape,
+    wmape,
+)
+
 # import findspark
 # findspark.init()  # to make sure SPARK_HOME env variable is set correctly
 

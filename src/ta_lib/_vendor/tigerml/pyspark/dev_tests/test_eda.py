@@ -1,12 +1,44 @@
 import pandas as pd
-from hypothesis import given, settings
-from hypothesis.extra.pandas import columns, data_frames, range_indexes, column
-from hypothesis.strategies import dates, floats, integers, booleans, tuples, sampled_from, composite, data, lists
 import pytest
+from hypothesis import given, settings
+from hypothesis.extra.pandas import column, columns, data_frames, range_indexes
+from hypothesis.strategies import (
+    booleans,
+    composite,
+    data,
+    dates,
+    floats,
+    integers,
+    lists,
+    sampled_from,
+    tuples,
+)
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, DataType, IntegerType, StringType, TimestampType, LongType, FloatType, StructField, Row
-from tigerml.pyspark.eda.eda import setanalyse, get_missing_values_summary, column_values_summary, get_datatypes, _missing_values, get_outliers_table, describe_categoricaldata
-from tigerml.pyspark.core.dp import list_numerical_columns, list_categorical_columns
+from pyspark.sql.types import (
+    DataType,
+    FloatType,
+    IntegerType,
+    LongType,
+    Row,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
+)
+from tigerml.pyspark.core.dp import (
+    list_categorical_columns,
+    list_numerical_columns,
+)
+from tigerml.pyspark.eda.eda import (
+    _missing_values,
+    column_values_summary,
+    describe_categoricaldata,
+    get_datatypes,
+    get_missing_values_summary,
+    get_outliers_table,
+    setanalyse,
+)
+
 # import findspark
 # findspark.init()  # to make sure SPARK_HOME env variable is set correctly
 

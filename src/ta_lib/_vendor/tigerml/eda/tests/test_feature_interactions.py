@@ -1,10 +1,9 @@
-import os
-import pathlib
-
 import holoviews as hv
 import numpy as np
+import os
 import pandas as pd
 import panel
+import pathlib
 import pytest
 import seaborn as sns
 from hypothesis import given, settings
