@@ -1,0 +1,7 @@
+channels:
+- conda-forge
+dependencies:
+- pip:
+  - pyspark==3.2.0
+  - pyspark_dist_explore==0.1.8
+  - py4j==0.10.9.2

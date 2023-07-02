@@ -1,0 +1,22 @@
+hyperparam:
+  RandomForest:
+    study_name: randomforest
+    n_trails: 5
+    model_import: sklearn.ensemble.RandomForestRegressor
+    metric: metrics.r2_score
+    metric_direction: maximize
+    params:
+      max_depth: [5,30]
+      max_features: [1,8]
+      n_estimators: [1,25]
+  XGBRegressor:
+    study_name: xgbregressor
+    n_trails: 5
+    model_import: xgboost.XGBRegressor
+    metric: metrics.r2_score
+    metric_direction: maximize
+    params:
+      max_depth: [1,10]
+      learning_rate: [0.01,1.0]
+      gamma: [0.01,1.0]
+    
