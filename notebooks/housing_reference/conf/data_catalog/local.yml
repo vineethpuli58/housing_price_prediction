@@ -1,0 +1,65 @@
+datasets:
+  raw:
+    housing:
+      type: ds
+      format: csv
+      uri: ${core.data_base_path}/raw/housing/housing.csv
+      driver_params: {}
+  
+  cleaned:
+    housing:
+      type: ds
+      format: csv
+      uri: ${core.data_base_path}/cleaned/housing/housing.csv
+      driver_params: {}
+  processed:
+    housing:
+      features:
+        type: ds
+        format: csv
+        uri: ${core.data_base_path}/processed/housing/features.csv
+        driver_params: {}
+      target:
+        type: ds
+        format: csv
+        uri: ${core.data_base_path}/processed/housing/target.csv
+        driver_params: {}        
+  train:
+    housing:
+      features:
+        type: ds
+        format: csv
+        uri: ${core.data_base_path}/test/housing/features.csv
+        driver_params:
+          save:
+            index: False
+      target:
+        type: ds
+        format: csv
+        uri: ${core.data_base_path}/test/housing/target.csv
+        driver_params:
+          save:
+            index: False
+  test:
+    housing:
+      features:
+        type: ds
+        format: csv
+        uri: ${core.data_base_path}/test/housing/features.csv
+        driver_params:
+          save:
+            index: False
+      target:
+        type: ds
+        format: csv
+        uri: ${core.data_base_path}/test/housing/target.csv
+        driver_params:
+          save:
+            index: False
+  score:
+    housing:
+      output:
+        type: ds
+        format: csv
+        uri: ${core.data_base_path}/score/housing/output.csv
+        driver_params: {}
