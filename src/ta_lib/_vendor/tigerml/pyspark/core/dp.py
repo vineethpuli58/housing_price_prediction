@@ -1,8 +1,11 @@
-"""Functions to carry out the Data Processing in a Generic Spark Project."""
+"""Functions to carry out the Data Processing in a Generic Spark Project(Regression).
 
-import random
+TBD:
+1. Train test split has only random split, should implement stratified split also.
+
+"""
+
 import re
-import string
 from cytoolz import curry
 from pyspark.ml import Estimator, Transformer
 from pyspark.ml.feature import VectorAssembler
@@ -102,43 +105,26 @@ def get_shape(df):
 
 
 @curry
-def clean_columns(data, strip=True, lower=False, sep="_"):
+def clean_columns(data, sep="_"):
     """Standardize the column names of the dataframe. Converts camelcase into snakecase.
 
     Parameters
     ----------
     spark:
-        spark instance
+      spark instance
     data: spark.DataFrame()
-        spark dataframe to clean the columns
-    strip: bool
-        strip to remove trailing whitespaces
-    lower: bool
-        convert the string to lowercase
+      spark dataframe to clean the columns
+    sep: str
+      seperator to add instead of spaces in the columns names
 
     Returns
     -------
     df: spark.DataFrame
      spark dataframe with new cleaned columns
     """
-    if not re.search(r"[ _-]", sep):
-        raise ValueError(f"Separator cannot be {sep}. Only _, -, and space is allowed")
     old_cols = data.columns
-    new_cols = []
-    for column in old_cols:
-        if strip:
-            column = column.strip()
-        # Replace spaces and special characters with underscores
-        column = re.sub(r"[^a-zA-Z0-9_]", sep, column)
-        if lower:
-            # Converts camelcase into snakecase
-            column = column.lower()
-        # Make sure the column name does not start with a number
-        if column[0].isnumeric():
-            column = "col_" + column
-        # Replace multipe underscores with single underscore
-        column = re.sub(f"{sep}+", sep, column)
-        new_cols.append(column)
+
+    new_cols = [re.sub("([a-z0-9])([A-Z])", r"\1_\2", x).lower() for x in old_cols]
     df = data.toDF(*new_cols)
     return df
 
@@ -191,41 +177,6 @@ def _clean_string_val(
             reg_str = "[^\\w" + "\\".join(list(special_chars_to_keep)) + " ]"
             df = df.withColumn(col_, F.regexp_replace(F.col(col_), reg_str, ""))
         return df
-
-
-@curry
-def list_numerical_categorical_columns(data, threshold=5):
-    """List the names of numerical categorical columns in the spark dataframe.
-
-    Parameters
-    ----------
-    data: pyspark.sql.DataFrame
-    threshold: int
-            percentage of unique value
-
-    Returns
-    -------
-    numeric_cat_cols: list
-            list of columns with numeric categories
-    """
-    schema = data.dtypes
-    no_of_rows = data.count()
-    numeric_cat_cols = []
-
-    # Consider all the columns excluding datatypes -
-    # ["date", "boolean", "timestamp", "double", "float", "string"]
-    possible_cat_cols = [
-        x[0]
-        for x in schema
-        if x[1] not in ["date", "boolean", "timestamp", "double", "float", "string"]
-    ]
-    for col in possible_cat_cols:
-        if (
-            len(data.select(col).distinct().rdd.map(lambda r: r[0]).collect())
-            / no_of_rows
-        ) * 100 < threshold:
-            numeric_cat_cols.append(col)
-    return numeric_cat_cols
 
 
 @curry
@@ -315,20 +266,17 @@ def identify_col_data_type(data, col):
 
     Parameters
     ----------
-      spark: SparkSession
-      data: pyspark.sql.DataFrame
-      col: str
-        column name
+      spark - SparkSession
+      data - pyspark.sql.DataFrame
+      col - str
+              column name
 
     Returns
     -------
     str - one of "boolean","numerical","date_like","categorical"
     """
-    num_cols = list(
-        set(list_numerical_columns(data))
-        - set(list_numerical_categorical_columns(data))
-    )
-    cat_cols = list_categorical_columns(data) + list_numerical_categorical_columns(data)
+    num_cols = list_numerical_columns(data)
+    cat_cols = list_categorical_columns(data)
     bool_cols = list_boolean_columns(data)
     date_cols = list_datelike_columns(data)
 
@@ -391,10 +339,7 @@ def handle_outliers(
             a dictionay that contains each columns, lower and upper bound
 
     """
-    num_cols = list(
-        set(list_numerical_columns(data))
-        - set(list_numerical_categorical_columns(data))
-    )
+    num_cols = list_numerical_columns(data)
     if not cols:
         cols = num_cols
     else:
@@ -418,10 +363,7 @@ def _calculate_outlier_bounds_iqr(data, cols, iqr_multiplier=1.5):
         Multiplier to use to define the lower and upper bounds based on IQR
 
     """
-    num_cols = list(
-        set(list_numerical_columns(data))
-        - set(list_numerical_categorical_columns(data))
-    )
+    num_cols = list_numerical_columns(data)
     if not cols:
         cols = num_cols
     else:
@@ -462,10 +404,7 @@ def _calculate_outlier_bounds_sdv(data, cols, sdv_multiplier=3):
     bounds: dict()
 
     """
-    num_cols = list(
-        set(list_numerical_columns(data))
-        - set(list_numerical_categorical_columns(data))
-    )
+    num_cols = list_numerical_columns(data)
     if not cols:
         cols = num_cols
     else:
@@ -516,10 +455,7 @@ def identify_outliers(data, cols=[], method="iqr", **kwargs):
     -------
         bounds: dict()
     """
-    num_cols = list(
-        set(list_numerical_columns(data))
-        - set(list_numerical_categorical_columns(data))
-    )
+    num_cols = list_numerical_columns(data)
     if not cols:
         cols = num_cols
     else:
@@ -1054,27 +990,3 @@ def test_train_split(
             train = train_ne.union(train_e)
             test = test_ne.union(test_e)
             return (train, test)
-
-
-def custom_column_name(col_name, data_columns):
-    """This function is used to customize column names in a dataframe.
-
-    Which helps in avoiding conflicts caused by having variable names same as column names.
-
-    We add a hash of length 5 to the existing column name for customisation.
-
-
-    Parameters
-    ----------
-    col_name: str
-    data_columns: list
-
-    Returns
-    -------
-        name: str
-    """
-    if col_name in data_columns:
-        name = col_name + "".join(random.choices(string.ascii_letters, k=5))
-    else:
-        name = col_name
-    return name

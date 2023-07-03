@@ -6,20 +6,15 @@ Data Sources
 Source ERD
 ==========
 
-ERD & data dictionary or all sources.
-
-Source validation rules
-=======================
-
-Rules to verified on source data such as cardinality, key mismatches, etc..
-
+The data has been downloaded from following URL:
+``"https://raw.githubusercontent.com/ageron/handson-ml2/master/datasets/housing/housing.tgz"``
 
 Source data summary
 ===================
+Reports regarding can be found in ``reports/model_experimenting/data_exploration_report.html`` 
 
-Reports for quick reference covering data preview, variable summaries, data health etc..
 
 Configurations
 ==============
 
-Describe Configuration files, Manual inputs & constants to be used in the project.
+To download the data we have to use the required ``housing_url`` and store it as required ``data/raw`` folder.

@@ -719,11 +719,10 @@ class SegmentedEDAReport(
         excel_params : dict
             Dictionary containing the following keys if the format is ".xlsx".
             If a key is not provided, it will take the default values.
-
-                - have_plot : boolean; default False.
-                    If True, keep the plots in image format in excel report.
-                - n_rows : int; default 100.
-                    Number of sample rows to keep for plot types containing all the records in data (for example, density plot, scatter plot etc.)
+            - have_plot : boolean; default False.
+              If True, keep the plots in image format in excel report.
+            - n_rows : int; default 100.
+              Number of sample rows to keep for plot types containing all the records in data (for example, density plot, scatter plot etc.)
         """
         self.create_report(y=y, quick=quick, corr_threshold=corr_threshold)
         if light_format:

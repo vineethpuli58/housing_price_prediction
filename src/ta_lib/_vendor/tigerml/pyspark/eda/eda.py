@@ -12,20 +12,10 @@ from pyspark.ml import Pipeline
 from pyspark.ml.feature import StringIndexer, VectorAssembler
 from pyspark.ml.stat import Correlation
 from pyspark.sql import functions as F
-from pyspark.sql.functions import col, desc, lit, percentile_approx
 from pyspark_dist_explore import distplot
 from tigerml.core.plots.bokeh import add_to_secondary, finalize_axes_right
 from tigerml.core.reports import create_report
 from tigerml.pyspark.core import dp
-from tigerml.pyspark.core.dp import (
-    custom_column_name,
-    identify_col_data_type,
-    list_boolean_columns,
-    list_categorical_columns,
-    list_datelike_columns,
-    list_numerical_categorical_columns,
-    list_numerical_columns,
-)
 from tigerml.pyspark.core.utils import (
     append_file_to_path,
     flatten_list,
@@ -76,7 +66,7 @@ def column_values_summary(data):
 
     Returns
     -------
-        df - pd.core.frame.DataFrame
+        df - pyspark.sql.DataFrame
     """
 
     # datatypes
@@ -140,8 +130,8 @@ def _missing_values(data):
 
     Returns
     -------
-    df_missing: pd.core.frame.DataFrame
-        pandas dataframe that contains summary of missing values
+    df_missing: pyspark.sql.DataFrame
+        pyspark dataframe that contains summary of missing values
 
     """
     no_of_rows = data.count()
@@ -315,14 +305,14 @@ def missing_value_summary(data):
 
     """
     df = _missing_values(data)
-    df = df.loc[df["No of Missing"] != 0].reset_index(drop=True)
+    df = df.loc[df["No of Missing"] != 0].reset_index()
     if df.empty:
         return "No Missing Values"
     else:
         return df
 
 
-def get_outliers(data, cols=None, get_index=False):
+def get_outliers(data, cols=None):
     """To get the summary of outliers.
 
     Parameters
@@ -330,112 +320,62 @@ def get_outliers(data, cols=None, get_index=False):
     data: pyspark.sql.DataFrame
     cols: list(str)
         list of numerical columns
-    get_index: bool, default=False
-        By default False, make it True for getting a dictionary with the index of outliers present in the data for both iqr and std bounds for each column
 
     Returns
     -------
     outliers_dict_iqr: dict
         contains the details of iqr bounds
-    outliers_dict_mean: dict
+    outliers_dict_mean:
         contains the details of std bounds
-    outliers_dict_index: dict
-        returned when get_index is set to True, contains index of outliers of both iqr and std bounds
     """
     iqr_bounds = dp._calculate_outlier_bounds_iqr(data, cols)
     mean_bounds = dp._calculate_outlier_bounds_sdv(data, cols)
     outliers_dict_iqr = {}
     outliers_dict_mean = {}
-    outliers_dict_index = {}
-    for column in cols:
-
-        col_in_process = [row[0] for row in data.select(column).collect()]
-
-        # fetching the upper and lower range of columns from
-        # iqr_bounds and mean_bounds (i.e iqr based and sdv based)
-        iqr_min = iqr_bounds[column]["min_b"]
-        iqr_max = iqr_bounds[column]["max_b"]
-        mean_min = mean_bounds[column]["min_b"]
-        mean_max = mean_bounds[column]["max_b"]
-
-        # creating the outlier list based in iqr range, where
-        # "upper" -> upper range outlier, "lower" -> lower range outlier
-        # else it is 0
-        map_iqr = list(
-            map(
-                lambda x: ("upper" if x > iqr_max else "lower" if x < iqr_min else 0)
-                if x is not None
-                else 0,
-                col_in_process,
-            )
+    df = data
+    for col_ in cols:
+        df = df.withColumn(
+            "lower_bound_iqr",
+            F.when(F.col(col_) < iqr_bounds[col_]["min_b"], 1).otherwise(0),
         )
-        # creating the outlier list based in standard deviation and mean, where
-        # "upper" -> upper range outlier, "lower" -> lower range outlier
-        # else it is 0
-        map_mean = list(
-            map(
-                lambda x: ("upper" if x > mean_max else "lower" if x < mean_min else 0)
-                if x is not None
-                else 0,
-                col_in_process,
-            )
+        df = df.withColumn(
+            "upper_bound_iqr",
+            F.when(F.col(col_) > iqr_bounds[col_]["max_b"], 1).otherwise(0),
         )
-
-        # iqr_based_outlier_count and mean_based_outlier_count
-        # are the placeholder array for number of outliers after the count
-        # from map_iqr and map_mean lists repectively.
-        iqr_based_outlier_count = [0, 0]
-        mean_based_outlier_count = [0, 0]
-
-        # taking count of outliers from the map_iqr and map_mean list
-        iqr_based_outlier_count[0] = map_iqr.count("lower")
-        iqr_based_outlier_count[1] = map_iqr.count("upper")
-        outliers_dict_iqr[column] = tuple(iqr_based_outlier_count)
-
-        mean_based_outlier_count[0] = map_mean.count("lower")
-        mean_based_outlier_count[1] = map_mean.count("upper")
-        outliers_dict_mean[column] = tuple(mean_based_outlier_count)
-        if get_index is True:
-            index_dict = {}
-            upper_mean = []
-            lower_mean = []
-            upper_iqr = []
-            lower_iqr = []
-            for idx, value in enumerate(map_iqr):
-                if value == "upper":
-                    upper_iqr.append(idx)
-                elif value == "lower":
-                    lower_iqr.append(idx)
-            for idx, value in enumerate(map_mean):
-                if value == "upper":
-                    upper_mean.append(idx)
-                elif value == "lower":
-                    lower_mean.append(idx)
-            index_dict["lower_mean"] = lower_mean
-            index_dict["upper_mean"] = upper_mean
-            index_dict["lower_iqr"] = lower_iqr
-            index_dict["upper_iqr"] = upper_iqr
-            outliers_dict_index[column] = index_dict
-    if get_index is True:
-        return outliers_dict_iqr, outliers_dict_mean, outliers_dict_index
-    else:
-        return outliers_dict_iqr, outliers_dict_mean
+        df = df.withColumn(
+            "lower_bound_mean",
+            F.when(F.col(col_) < mean_bounds[col_]["min_b"], 1).otherwise(0),
+        )
+        df = df.withColumn(
+            "upper_bound_mean",
+            F.when(F.col(col_) > mean_bounds[col_]["max_b"], 1).otherwise(0),
+        )
+        agg_df = (
+            df.select(
+                "lower_bound_iqr",
+                "upper_bound_iqr",
+                "lower_bound_mean",
+                "upper_bound_mean",
+            )
+            .groupBy()
+            .sum()
+            .collect()
+        )
+        outliers_dict_iqr[col_] = (agg_df[0][0], agg_df[0][1])
+        outliers_dict_mean[col_] = (agg_df[0][2], agg_df[0][3])
+    return outliers_dict_iqr, outliers_dict_mean
 
 
-def get_outliers_table(data, get_index=False):
+def get_outliers_table(data):
     """To get a dataframe with outlier analysis table.
 
     Parameters
     ----------
     data: pyspark.sql.DataFrame
-    get_index: bool, default=False
-        By default False, if True it returns the outliers_df with index of outliers
 
     Returns
     -------
-    outliers_df: pandas.core.frame.DataFrame
-        when get_index flag is False, it returns dataframe with count of outliers for both iqr and std bounds
-        when get_index flag is True, it returns dataframe with count of outliers aswell as index of those outliers for both iqr and std bounds
+    outliers_df: pyspark.sql.DataFrame
     """
     if data is None:
         raise ValueError("Data is not provided")
@@ -445,212 +385,24 @@ def get_outliers_table(data, get_index=False):
         "< (1stQ - 1.5 * IQR)",
         "> (3rdQ + 1.5 * IQR)",
     ]
-    numerical_columns = list(
-        set(dp.list_numerical_columns(data))
-        - set(dp.list_numerical_categorical_columns(data))
+    numerical_columns = dp.list_numerical_columns(data)
+    outliers_dict_iqr, outliers_dict_mean = get_outliers(data, numerical_columns)
+    outliers_df = pd.DataFrame.from_dict(outliers_dict_mean)
+    outliers_df = pd.concat([outliers_df, pd.DataFrame.from_dict(outliers_dict_iqr)])
+    outliers_df = outliers_df.reset_index(drop=True).T
+    outliers_df.rename(
+        columns=dict(zip(list(outliers_df.columns), outlier_col_labels)), inplace=True
     )
-    if len(numerical_columns) != 0:
-        if get_index is True:
-            outliers_dict_iqr, outliers_dict_mean, outliers_dict_index = get_outliers(
-                data, numerical_columns, get_index=True
-            )
-        else:
-            outliers_dict_iqr, outliers_dict_mean = get_outliers(
-                data, numerical_columns, get_index=False
-            )
-        outliers_df = pd.DataFrame.from_dict(outliers_dict_mean)
-        outliers_df = pd.concat(
-            [outliers_df, pd.DataFrame.from_dict(outliers_dict_iqr)]
-        )
-        outliers_df = outliers_df.reset_index(drop=True).T
-        outliers_df.rename(
-            columns=dict(zip(list(outliers_df.columns), outlier_col_labels)),
-            inplace=True,
-        )
-        outliers_sum = outliers_df.sum(axis=1)
-        outliers_df = outliers_df[outliers_sum > 0]
-        outliers_df.index.name = "feature"
-        """ Creating a new outliers_index_df dataframe with index of outliers from
-        outliers_dict_index dictionary and merged with the existing outliers_df with count of outliers """
-        if get_index is True:
-            outliers_index_df = pd.DataFrame.from_dict(
-                outliers_dict_index
-            ).T.rename_axis("feature")
-            outlier_col_labels_with_index = [
-                "< (mean-3*std) Index",
-                "> (mean+3*std) Index",
-                "< (1stQ - 1.5 * IQR) Index",
-                "> (3rdQ + 1.5 * IQR) Index",
-            ]
-            outliers_index_df.rename(
-                columns=dict(
-                    zip(list(outliers_index_df.columns), outlier_col_labels_with_index)
-                ),
-                inplace=True,
-            )
-            outliers_df = pd.merge(
-                outliers_df, outliers_index_df, left_index=True, right_index=True
-            )
-        return outliers_df
-    else:
-        outliers_df = pd.DataFrame([], columns=outlier_col_labels)
-        outliers_df.index.name = "feature"
-        return outliers_df
-
-
-def data_health_recommendations(data):
-    """
-    Get health recommendations that can be applied on the data.
-
-    The recommendations are made to improve the quality of the data,
-    These are not Data Science recommendations.
-
-    Parameters
-    ----------
-    data: pyspark.sql.dataframe.DataFrame
-        Spark DataFrame for which you want to get the recommendations.
-
-    Returns
-    -------
-    recommendation_df: pd.DataFrame
-        The df containing 2 columns, Recommendations, Reason for Recommendation
-
-    """
-    recommendation_list = []
-    reason_list = []
-    # Recommendation 1: Drop duplicate columns if present(get from health plot)
-    # pip install chispa for column equality
-
-    # Recommendation 2: Drop duplicates rows if present
-    duplicate_row_count = data.count() - data.dropDuplicates().count()
-    if duplicate_row_count:
-        recommendation_list.append("Drop duplicates rows")
-        reason_list.append(f"There are {duplicate_row_count} duplicate rows")
-
-    # Recommendation 3: Drop null cols if present(get from missing summary)
-    df_missing = missing_value_summary(data)
-    null_cols = []
-    if not isinstance(df_missing, str):
-        null_cols = df_missing[df_missing["Percentage Missing"] > 60][
-            "Variable Name"
-        ].to_list()
-        if len(null_cols) > 0:
-            recommendation_list.append(
-                "Drop columns with high percentage of null values"
-            )
-            reason_list.append(f"Column(s) {null_cols} have more than 60% null values")
-
-    # Recommendation 4: Check if no. of columns is >2 if more than proceed,
-    # else display to user that EDA cannot be performed and get more data to continue
-    if (len(data.columns) - len(null_cols)) < 2:
-        recommendation_list.append(
-            "Add more data to your data source to generate EDA charts"
-        )
-        reason_list.append(
-            f"After dropping columns with high percentage of null values, you are left with <2 columns"
-        )
-
-        # Create a DataFrame
-        if len(recommendation_list) == 0:
-            recommendation_list.append("No Recommendations")
-            reason_list.append("No Recommendations")
-
-        recommendation_df = pd.DataFrame(
-            {
-                "Recommendations": recommendation_list,
-                "Reason For Recommendation": reason_list,
-            }
-        )
-        return recommendation_df
-
-    # Recommendation 5: DataType check to typecast to common ones if present(get % of non-numeric from health plots and do dtype check on them)
-    numerical_columns, non_numerical_columns = get_datatypes(data)
-    non_string_columns = non_numerical_columns - set(list_categorical_columns(data))
-    if len(non_string_columns) > 0:
-        recommendation_list.append(
-            "Convert dtype of columns to string(categorical columns) OR a numeric type"
-        )
-        reason_list.append(
-            f"Columns {non_string_columns} are of dtypes {data.select(*non_string_columns).dtypes}"
-        )
-
-    # Recommendation 6: Imputation Columns
-    # Can be recommended if the num of null rows is <5% if present (get from missing summary)
-    imputation_cols = []
-    if not isinstance(df_missing, str):
-        imputation_cols = df_missing[df_missing["Percentage Missing"] <= 5][
-            "Variable Name"
-        ].to_list()
-        if len(imputation_cols) > 0:
-            recommendation_list.append("Impute columns")
-            reason_list.append(
-                f"Columns {imputation_cols} have less than 5% missing values."
-            )
-
-    data_without_nulls = data.drop(*null_cols)
-    data_without_imputation = data_without_nulls.drop(*imputation_cols)
-    # Recommendation 7: Drop rows where null present in more than 1 cols
-    threshold = len(data_without_imputation.columns) - 1
-    multi_null_rows = (
-        data_without_imputation.count()
-        - data_without_imputation
-        .dropna(thresh=threshold)
-        .count()
-    )
-    if multi_null_rows > 0:
-        recommendation_list.append(
-            "Drop rows where null is present in more than 1 columns"
-        )
-        reason_list.append(f"{multi_null_rows} rows have more than 1 null values.")
-
-    # Recommendation 8: Imputation Columns
-    # Can be recommended if the num of null rows is <5% if present (get from missing summary)
-    df_missing_2 = missing_value_summary(
-        data_without_imputation.dropna(thresh=threshold)
-    )
-    imputation_cols_2 = []
-    if not isinstance(df_missing_2, str):
-        imputation_cols_2 = df_missing_2[df_missing_2["Percentage Missing"] <= 5][
-            "Variable Name"
-        ].to_list()
-        if len(imputation_cols_2) > 0:
-            recommendation_list.append(
-                "Impute columns after dropping rows where null is present in more than 1 columns"
-            )
-            reason_list.append(
-                f"Columns {imputation_cols_2} have less than 5% missing values after dropping rows where null is present in more than 1 columns."
-            )
-
-    # Recommendation 9: Drop null rows
-    imputation_cols_total = imputation_cols + imputation_cols_2
-    data_without_null_imputation = data_without_nulls.drop(*imputation_cols_total).dropna()
-    null_rows = (
-        data_without_null_imputation.count()
-        - data_without_null_imputation.dropna().count()
-    )
-    if null_rows > 0:
-        recommendation_list.append("Drop null rows that cannot be properly imputed")
-        reason_list.append(
-            f"{null_rows} rows can be dropped as they cannot be properly imputed"
-        )
-
-    # Create a DataFrame
-    if len(recommendation_list) == 0:
-        recommendation_list.append("No Recommendations")
-        reason_list.append("No Recommendations")
-    recommendation_df = pd.DataFrame(
-        {
-            "Recommendations": recommendation_list,
-            "Reason For Recommendation": reason_list,
-        }
-    )
-    return recommendation_df
+    outliers_sum = outliers_df.sum(axis=1)
+    outliers_df = outliers_df[outliers_sum > 0]
+    outliers_df.index.name = "feature"
+    return outliers_df
 
 
 def health_analysis(data, save_as=None, save_path=""):
     """Data health report.
 
-    Compiles outputs from data_health, missing_plot, missing_value_summary, get_outliers_df and data_health_recommendations as a report.
+    Compiles outputs from data_health, missing_plot, missing_value_summary and get_outliers_df as a report.
 
     Parameters
     ----------
@@ -674,7 +426,6 @@ def health_analysis(data, save_as=None, save_path=""):
     )
 
     health_analysis_report.update({"outliers_in_features": get_outliers_table(data)})
-    health_analysis_report.update({"data_health_recommendation": data_health_recommendations(data)})
     if save_as:
         default_report_name = "health_analysis_report_at_{}".format(time_now_readable())
         save_path = append_file_to_path(save_path, default_report_name + save_as)
@@ -694,92 +445,85 @@ def describe_data(data, columns):
     ----------
     data: pyspark.sql.DataFrame
     columns: list(str)
-            the column name list of the numerical variables
+            the cloumn name list of the numerical variable
 
     Returns
     -------
-    describe_df: pd.DataFrame
+    new_df: pyspark.sql.DataFrame
         the numerical describe info. of the input dataframe
     """
-    numeric_df = data.select(columns)
+    percentiles = [25, 50, 75]
+    # array_list=[np.array([row[f"{x}"] for row in data.select(x).collect()],dtype='float') for x in columns]
+    temp = data.select(columns).toPandas()
+    array_list = [np.array(temp[f"{x}"], dtype="float") for x in columns]
+    array_list_samples = [
+        list(np.unique(np.unique(row[~np.isnan(row)])[-5:])) for row in array_list
+    ]
+    array_list_unique = [len(np.unique(row[~np.isnan(row)])) for row in array_list]
+    percs = [np.nanpercentile(row, percentiles) for row in array_list]
+    percs = np.transpose(percs)
+    percs = pd.DataFrame(percs, columns=columns)
+    samples = pd.DataFrame([array_list_samples], columns=columns)
+    percs = pd.DataFrame([array_list_unique], columns=columns).append(percs)
+    percs = samples.append(percs)
+    percs["summary"] = ["samples", "nunique"] + [str(p) + "%" for p in percentiles]
 
-    # Get Pyspark describe df,convert to pd.df to transpose
-    describe_df = numeric_df.describe().toPandas().T
-    # Make 1st row as column
-    describe_df.columns = describe_df.iloc[0]
-    # Drop 1st row
-    describe_df.drop(index=describe_df.index[0], axis=0, inplace=True)
-    # Create new cols
-    describe_df["samples"] = None
-    describe_df["nunique"] = None
-    describe_df["25%"] = None
-    describe_df["50%"] = None
-    describe_df["75%"] = None
-
-    for c in numeric_df.columns:
-        numeric_series = numeric_df.select(c).dropna().distinct()
-        nunique = numeric_series.count()
-        samples = numeric_series.limit(5).rdd.flatMap(lambda x: x).collect()
-        describe_df.at[c, "samples"] = samples
-        describe_df.at[c, "nunique"] = nunique
-        percentile_list = numeric_df.select(
-            F.percentile_approx(
-                col=c, percentage=[0.25, 0.5, 0.75], accuracy=10000
-            ).alias("q")
-        ).first()[0]
-        describe_df.at[c, "25%"] = percentile_list[0]
-        describe_df.at[c, "50%"] = percentile_list[1]
-        describe_df.at[c, "75%"] = percentile_list[2]
-
-    # Rename Index column
-    describe_df.index.rename(None, inplace=True)
-
-    return describe_df
+    spark_describe = data.describe().toPandas()
+    drop_cols = list(set(spark_describe.columns) - set(percs.columns))
+    spark_describe.drop(drop_cols, axis=1, inplace=True)
+    new_df = pd.concat([spark_describe, percs], ignore_index=True)
+    new_df = new_df.round(2)
+    new_df = new_df.T
+    new_df.columns = list(np.concatenate(new_df.loc[new_df.index == "summary"].values))
+    new_df.drop("summary", inplace=True)
+    return new_df
 
 
 def describe_categoricaldata(data, cat_cols):
-    """Obtain basic stats results of categorical data.
+    """Obtain basic stats results and percentiles of categorical data.
 
     Parameters
     ----------
     data: pyspark.sql.DataFrame
     cat_cols: list(str)
-            the column name list of the categorical variable
+            the cloumn name list of the categorical variable
 
     Returns
     -------
-    describe_df: pd.DataFrame
+    new_df: pd.DataFrame
         the categorical describe info. of the input dataframe
     """
-    cat_cols = sorted(cat_cols)
-    categorical_df = data.select(cat_cols)
-    # Create empty df
-    describe_df = pd.DataFrame(
-        index=cat_cols, columns=["nunique", "samples", "mode", "mode_freq"]
+    na_list = ["nan", "NA"]
+    # array_list=[np.array([row[f"{x}"] for row in data.select(x).collect()],dtype='str') for x in cat_cols]
+    temp = data.select(cat_cols).toPandas()
+    array_list = [np.array(temp[f"{x}"], dtype="str") for x in cat_cols]
+    array_list_samples = [
+        list(np.unique(np.unique([val_ for val_ in row if val_ not in na_list])[-5:]))
+        for row in array_list
+    ]
+    array_list_unique = [
+        len(np.unique([val_ for val_ in row if val_ not in na_list]))
+        for row in array_list
+    ]
+    samples = pd.DataFrame([array_list_samples], columns=cat_cols)
+    unique_df = pd.DataFrame([array_list_unique], columns=cat_cols)
+    samples = unique_df.append(samples)
+    mode_list = [
+        max(dict(Counter(row)), key=dict(Counter(row)).get) for row in array_list
+    ]
+    samples = samples.append(pd.DataFrame([mode_list], columns=cat_cols))
+    mode_freq = [
+        dict(Counter(row)).get(mode_) for row, mode_ in zip(array_list, mode_list)
+    ]
+    samples = samples.append(pd.DataFrame([mode_freq], columns=cat_cols))
+    samples["summary"] = ["nunique", "samples", "mode", "mode_freq"]
+    samples = samples.T
+    samples.columns = list(
+        np.concatenate(samples.loc[samples.index == "summary"].values)
     )
+    samples.drop("summary", inplace=True)
 
-    for c in cat_cols:
-        categorical_series = categorical_df.select(c).dropna().distinct()
-        nunique = categorical_series.count()
-        samples = categorical_series.limit(5).rdd.flatMap(lambda x: x).collect()
-        describe_df.at[c, "samples"] = samples
-        describe_df.at[c, "nunique"] = nunique
-        mode_modefreq_list = (
-            categorical_df.select(c)
-            .groupBy(c)
-            .count()
-            .sort("count", ascending=False)
-            .limit(1)
-            .rdd.flatMap(lambda x: x)
-            .collect()
-        )
-        describe_df.at[c, "mode"] = mode_modefreq_list[0]
-        describe_df.at[c, "mode_freq"] = mode_modefreq_list[1]
-
-    # Rename Index column
-    describe_df.index.rename(None, inplace=True)
-
-    return describe_df
+    return samples
 
 
 def feature_analysis_table(data):
@@ -796,46 +540,10 @@ def feature_analysis_table(data):
     categorical_description: pd.DataFrame
         contains the descriptive statistics of categorical variables.
     """
-    numerical_columns = list(
-        set(dp.list_numerical_columns(data))
-        - set(dp.list_numerical_categorical_columns(data))
-    )
-    if len(numerical_columns) == 0:
-        columns = [
-            "count",
-            "mean",
-            "stddev",
-            "min",
-            "max",
-            "samples",
-            "nunique",
-            "25%",
-            "50%",
-            "75%",
-        ]
-        numerical_description = pd.DataFrame([], columns=columns)
-        numerical_description = numerical_description.reset_index(level=0).drop(
-            ["index"], axis=1
-        )
-    else:
-        numerical_description = describe_data(data, numerical_columns)
-
-    categorical_columns = dp.list_categorical_columns(
-        data
-    ) + dp.list_numerical_categorical_columns(data)
-    if len(categorical_columns) == 0:
-        columns = [
-            "nunique",
-            "samples",
-            "mode",
-            "mode_freq",
-        ]
-        categorical_description = pd.DataFrame([], columns=columns)
-        categorical_description = categorical_description.reset_index(level=0).drop(
-            ["index"], axis=1
-        )
-    else:
-        categorical_description = describe_categoricaldata(data, categorical_columns)
+    numerical_columns = dp.list_numerical_columns(data)
+    numerical_description = describe_data(data, numerical_columns)
+    categorical_columns = dp.list_categorical_columns(data)
+    categorical_description = describe_categoricaldata(data, categorical_columns)
     return numerical_description, categorical_description
 
 
@@ -846,15 +554,10 @@ def density_plots_numerical(data):
     ----------
     data: pyspark.sql.DataFrame
     """
-    num_cols = list(
-        set(dp.list_numerical_columns(data))
-        - set(dp.list_numerical_categorical_columns(data))
-    )
+    num_cols = dp.list_numerical_columns(data)
     fig, axes = plt.subplots(nrows=int(np.ceil(len(num_cols) / 2)), ncols=2)
     fig.set_size_inches(20, 20)
-    # Concatenate only if axes is multi-dimensional
-    if axes.ndim > 1:
-        axes = np.concatenate(axes)
+    axes = np.concatenate(axes)
     plots_dict = {}
     for index_, col_ in enumerate(num_cols):
         plot_ = distplot(axes[index_], [data.select(col_)], bins=40)  # noqa
@@ -881,9 +584,11 @@ def non_numeric_frequency_plots(data, cols):
     plots_dict = {}
     for col_ in sorted(cols):
         series = data.select(col_)
-        summary_df = series.describe().toPandas().T
-        summary_df.columns = summary_df.iloc[0]
-        summary_df.drop(index=summary_df.index[0], axis=0, inplace=True)
+        summary_df = series.describe().toPandas().T.round(2)
+        summary_df.columns = list(
+            np.concatenate(summary_df.loc[summary_df.index == "summary"].values)
+        )
+        summary_df.drop("summary", inplace=True)
         summary_table = hvPlot(summary_df).table(
             columns=list(summary_df.columns), height=60, width=600
         )
@@ -1033,27 +738,22 @@ def feature_density_plots(data, num_cols=[], cat_cols=[]):
         dict containing the bar plots of categorical variables
 
     """
-    categorical_cols = dp.list_categorical_columns(
-        data
-    ) + dp.list_numerical_categorical_columns(data)
+    categorical_cols = dp.list_categorical_columns(data)
     if not cat_cols:
         cat_cols = categorical_cols
     else:
-        for column in cat_cols:
+        for col in cat_cols:
             assert (  # noqa
-                column in categorical_cols
+                col in categorical_cols
             ), "{0} is not a valid categorical column in the input data"
 
-    numerical_cols = list(
-        set(dp.list_numerical_columns(data))
-        - set(dp.list_numerical_categorical_columns(data))
-    )
+    numerical_cols = dp.list_numerical_columns(data)
     if not num_cols:
         num_cols = numerical_cols
     else:
-        for column in num_cols:
+        for col in num_cols:
             assert (  # noqa
-                column in numerical_cols
+                col in numerical_cols
             ), "{0} is not a valid numerical column in the input data"
     numerical_plots = density_plots(data, numerical_cols)
     categorical_plots = non_numeric_frequency_plots(data, categorical_cols)
@@ -1061,7 +761,9 @@ def feature_density_plots(data, num_cols=[], cat_cols=[]):
 
 
 def feature_analysis(data, save_as=None, save_path=""):
-    """Univariate analysis for the columns. Generates summary_stats and distributions plots for columns.
+    """Univariate analysis for the columns.
+
+    Generate summary_stats, distributions and normality tests for columns.
 
     Parameters
     ----------
@@ -1122,13 +824,12 @@ def correlation_table(data, plot="table"):
     if len(cat_cols):
         data = label_encode(data, cat_cols)
     cols = dp.list_numerical_columns(data)
-    outputCol_name = custom_column_name("features", data.columns)
     assembler = VectorAssembler(
-        inputCols=cols, outputCol=outputCol_name, handleInvalid="skip"
+        inputCols=cols, outputCol="features", handleInvalid="skip"
     )
-    df_vector = assembler.transform(data).select(outputCol_name)
-    corr_mat = Correlation.corr(df_vector, outputCol_name, method="pearson")
-    corr_mat = corr_mat.collect()[0].asDict()[f"pearson({outputCol_name})"]
+    df_vector = assembler.transform(data).select("features")
+    corr_mat = Correlation.corr(df_vector, "features", method="pearson")
+    corr_mat = corr_mat.collect()[0].asDict()["pearson(features)"]
     corr_df = pd.DataFrame(corr_mat.toArray())
     corr_df.index, corr_df.columns = cols, cols
 
@@ -1145,238 +846,10 @@ def correlation_table(data, plot="table"):
         return heatmap
 
 
-def num_vs_num_bivariate(data, num_col1: str, num_col2: str, return_plots=False):
-    """Get bivaraite data for numerical vs numerical features.
-
-    Parameters
-    ----------
-    data: pyspark.sql.DataFrame
-    num_col1: str
-        first numerical column
-    num_col2: str
-        second numerical column
-    return_plots:  bool, default=False
-        If false return bivariate data dataframe, else return both bivariate data and bivariate plot data
-
-    Returns
-    -------
-    num_vs_num_bivariate: pyspark.sql.DataFrame
-        contains bivariate data
-    chart: holoviews.element.chart.Scatter
-        return when return_plots is True, contains hv scatter plot
-    """
-    num_vs_num_df = data.select(col(num_col1), col(num_col2)).dropna()
-    if return_plots:
-        df = num_vs_num_df.toPandas()
-        chart = hvPlot(df).scatter(x=num_col1, y=num_col2, height=400, width=400)
-        return num_vs_num_df, chart
-    return num_vs_num_df
-
-
-def cat_vs_cat_bivariate(data, cat_col1: str, cat_col2: str, return_plots=False):
-    """Get bivaraite data for categorical vs categorical features. Limited to top 10 most frequent categorical values.
-
-    Parameters
-    ----------
-    data: pyspark.sql.DataFrame
-    cat_col1: str
-        first categorical column
-    cat_col2: str
-        second categorical column
-    return_plots:  bool, default=False
-        If false return bivariate data dataframe, else return both bivariate data and bivariate plot data
-
-    Returns
-    -------
-    processed_df: pyspark.sql.DataFrame
-        contains bivariate data
-    chart: holoviews.element.chart.Bar
-        return when return_plots is True, contains hv bar plot
-    """
-    cat_vs_cat_df = data.select(col(cat_col1), col(cat_col2)).dropna()
-    processed_df = (
-        cat_vs_cat_df.groupBy([cat_col1, cat_col2])
-        .agg({cat_col2: "count"})
-        .withColumnRenamed(f"count({cat_col2})", "Total_count")
-        .replace(float("nan"), None)
-        .sort(col("Total_count").desc())
-    )
-    if return_plots:
-        df = processed_df.limit(10).toPandas()
-        chart = hvPlot(df).bar(
-            ylabel="Number of " "Observations",
-            x=cat_col2,
-            y="Total_count",
-            by=cat_col1,
-            stacked=True,
-            rot=45,
-        )
-        return processed_df, chart
-    return processed_df
-
-
-def cat_vs_num_bivariate(data, cat_col: str, num_col: str, return_plots=False):
-    """Get bivaraite data for categorical vs categorical features. Limited to top 10 most frequent categorical values.
-
-    Parameters
-    ----------
-    data: pyspark.sql.DataFrame
-    cat_col: str
-        first categorical column
-    num_col: str
-        second numerical column
-    return_plots:  bool, default=False
-        If false return bivariate data dataframe, else return both bivariate data and bivariate plot data
-
-    Returns
-    -------
-    q_df: pyspark.sql.DataFrame
-        contains bivariate data
-    chart: holoviews.element.chart.Violin
-        return when return_plots is True, contains hv violin plot
-    """
-    cat_vs_num_df = data.select(col(cat_col), col(num_col)).dropna()
-    q_df = (
-        cat_vs_num_df.groupBy(cat_col)
-        .agg(
-            percentile_approx(num_col, 0.25, lit(10000)).alias("q1"),
-            percentile_approx(num_col, 0.75, lit(10000)).alias("q3"),
-            F.min(num_col).alias("min"),
-            F.max(num_col).alias("max"),
-        )
-        .sort(col(cat_col))
-    )
-    if return_plots:
-        cat_vs_num_top_10_categories = (
-            cat_vs_num_df.groupBy(cat_col).count().sort(desc("count")).limit(10)
-        )
-        pandas_df = cat_vs_num_top_10_categories.toPandas()
-        column_list = pandas_df[cat_col].tolist()
-        filtered_df = cat_vs_num_df.filter(cat_vs_num_df[cat_col].isin(column_list))
-        filtered_pandas_df = filtered_df.toPandas()
-        chart = hvPlot(filtered_pandas_df).violin(
-            y=num_col, by=cat_col, height=400, width=400, legend=False
-        )
-        return q_df, chart
-    return q_df
-
-
-def get_bivariate(data, features=None, corr_table=None, return_plots=False, top_n=10):
-    """Extract Bivariate data from the dataframe.
-
-    Generates all the numerical vs numerical, categorical vs numerical and categorical
-    vs numerical feature interaction data and plots
-
-    Parameters
-    ----------
-    data: pyspark.sql.DataFrame
-    features: list, default = 'None'
-        By deafult we consider all features, else provide list of features to get bivariates for
-    corr_table: pd.DataFrame, default = 'None'
-        corr_table required for feature interactions
-    return_plots:  bool, default=False
-        If false return bivariate data, else return both bivariate data and bivariate plots
-    top_n: int, default = 10
-        Number of bivariates to be generated, if top_n > rows in corr_table we display all rows
-
-
-    Examples
-    --------
-    >>> from tigerml.pyspark.eda import get_bivariate
-    >>> from tigerml.pyspark.eda import correlation_table
-    >>> df = spark.read.parquet("train.parquet")
-    >>> features = df.columns[0:2]
-    >>> data = df.select([features[0],features[1]])
-    >>> correlation = correlation_table(data, plot="table")
-    >>> get_bivariate(data, features=features, corr_table=correlation, return_plots=False, top_n=10)
-
-    Returns
-    -------
-    bivariate_data_dict: dict
-        contains bivariate data
-    bivariate_plot_dict: dict
-        return when return_plots is True, conatins bivariate plots
-    """
-    if features is None:
-        data = data
-    else:
-        data = data.select(features)
-    if corr_table is None:
-        corr_table = correlation_table(data=data)
-
-    corr_table = corr_table[corr_table.var1 != corr_table.var2]
-    corr_table["corr_coef"] = abs(corr_table["corr_coef"])
-    corr_table = corr_table.sort_values("corr_coef", ascending=False).head(top_n)
-    correlation_array = corr_table.to_numpy()
-    date_cols = list_datelike_columns(data=data)
-    num_cat_cols = list_numerical_categorical_columns(data)
-    cat_cols = (
-        list_boolean_columns(data=data)
-        + list_categorical_columns(data)
-        + date_cols
-        + num_cat_cols
-    )
-    num_cols = list_numerical_columns(data=data)
-    num_cols = list(set(num_cols) - set(cat_cols))
-    bivariate_data_dict = {}
-    bivariate_plot_dict = {}
-    # Generates list_of_bivariate_plots
-    for i, bi_variate_corr in enumerate(correlation_array):
-        num_of_bivariate = top_n if top_n is not None else len(data.columns)
-        if (len(bivariate_data_dict)) >= num_of_bivariate:
-            break
-        col_type = []
-        # Loop for identifying col type
-        for j, var in enumerate(bi_variate_corr[0:2]):
-            # identify var type
-            if "label_encoded_" in var:
-                correlation_array[i][j] = var.replace("label_encoded_", "")
-                col_type.append("categorical")
-            elif var in cat_cols:
-                col_type.append("categorical")
-            elif var in num_cols:
-                col_type.append("numerical")
-            else:
-                col_type.append("categorical")
-        # Redirect to respective plots based on col types
-        if col_type[0] == "numerical" and col_type[1] == "numerical":
-            bivariate_data = num_vs_num_bivariate(
-                data, bi_variate_corr[0], bi_variate_corr[1], return_plots=return_plots
-            )
-
-        elif col_type[0] == "numerical" and col_type[1] == "categorical":
-            bivariate_data = cat_vs_num_bivariate(
-                data, bi_variate_corr[1], bi_variate_corr[0], return_plots=return_plots
-            )
-
-        elif col_type[0] == "categorical" and col_type[1] == "numerical":
-            bivariate_data = cat_vs_num_bivariate(
-                data, bi_variate_corr[0], bi_variate_corr[1], return_plots=return_plots
-            )
-
-        elif col_type[0] == "categorical" and col_type[1] == "categorical":
-            bivariate_data = cat_vs_cat_bivariate(
-                data, bi_variate_corr[0], bi_variate_corr[1], return_plots=return_plots
-            )
-        key = f"{bi_variate_corr[0]} vs {bi_variate_corr[1]}"
-        if return_plots:
-            bivariate_df, bivariate_plot_data = bivariate_data
-            bivariate_plot_data = bivariate_plot_data.opts(
-                title=f"Correlation {round(bi_variate_corr[2], 3)}"
-            )
-            bivariate_data_dict[key] = bivariate_df
-            bivariate_plot_dict[key] = bivariate_plot_data
-        else:
-            bivariate_df = bivariate_data
-            bivariate_data_dict[key] = bivariate_df
-    if return_plots:
-        return bivariate_data_dict, bivariate_plot_dict
-    else:
-        return bivariate_data_dict
-
-
 def feature_interactions(data, save_as=None, save_path=""):
-    """Compiles outputs from correlation_table, correlation_heatmap, covariance_heatmap and bivariate_plots as a report.
+    """Feature interactions report.
+
+    Compiles outputs from correlation_table, correlation_heatmap, covariance_heatmap and bivariate_plots as a report.
 
     Parameters
     ----------
@@ -1395,10 +868,6 @@ def feature_interactions(data, save_as=None, save_path=""):
     feature_interactions_report = {}
     feature_interactions_report["correlation_table"] = [correlation_table(data)]
     feature_interactions_report["correlation_heatmap"] = [correlation_table(data, "")]
-    bivariate_data, bivariate_plots = get_bivariate(data, return_plots=True)
-    feature_interactions_report[
-        "bivariate_plots (Top 10 correlations)"
-    ] = bivariate_plots
 
     if save_as:
         default_report_name = "feature_interactions_report_at_{}".format(
@@ -1430,25 +899,20 @@ def correlation_with_target(data, target_var, cols=None):
     -------
     plot: hvplot of bars related to the correlation with target variable
     """
-    # Renaming the string categorical col if it is target variable
-    cat_cols = dp.list_categorical_columns(data)
-    if target_var in cat_cols:
-        target_var = f"label_encoded_{target_var}"
-    else:
-        target_var = target_var
-
     if not cols:
+        cat_cols = dp.list_categorical_columns(data)
+
+        cat_cols = [i for i in cat_cols if i != target_var]
         if len(cat_cols):
             data = label_encode(data, cat_cols)
 
         cols = dp.list_numerical_columns(data)
-    outputCol_name = custom_column_name("features", data.columns)
     assembler = VectorAssembler(
-        inputCols=cols, outputCol=outputCol_name, handleInvalid="skip"
+        inputCols=cols, outputCol="features", handleInvalid="keep"
     )
-    df_vector = assembler.transform(data).select(outputCol_name)
-    corr_mat = Correlation.corr(df_vector, outputCol_name, method="pearson")
-    corr_mat = corr_mat.collect()[0].asDict()[f"pearson({outputCol_name})"]
+    df_vector = assembler.transform(data).select("features")
+    corr_mat = Correlation.corr(df_vector, "features", method="pearson")
+    corr_mat = corr_mat.collect()[0].asDict()["pearson(features)"]
     corr_df = pd.DataFrame(corr_mat.toArray())
     corr_df.index, corr_df.columns = cols, cols
     corr_df = corr_df[[target_var]]
@@ -1490,7 +954,7 @@ def label_encode(data, cat_cols):
 
 
 def feature_importance(data, target_var, classification=False):
-    """Get feature importance plot based on RandomForestRegressor or RandomForestClassifier.
+    """Get feature importance based on RandomForestRegressor or RandomForestClassifier.
 
     Parameters
     ----------
@@ -1506,50 +970,46 @@ def feature_importance(data, target_var, classification=False):
         feature importance plot based on Random Forests
     """
     cat_cols = dp.list_categorical_columns(data)
-    unique_list = []
-    for c in cat_cols:
-        nunique = data.select(c).dropna().distinct().count()
-        unique_list.append(nunique)
-    if unique_list:
-        bins = max(unique_list) + 1
-    else:
-        bins = 100
+
     if len(cat_cols):
         data = label_encode(data, cat_cols)
-    input_cols = dp.list_numerical_columns(data)
-    if target_var in input_cols:
-        input_cols.remove(target_var)
-    elif f"label_encoded_{target_var}" in input_cols:
-        input_cols.remove(f"label_encoded_{target_var}")
-    outputCol_name = custom_column_name("features", data.columns)
-    assembler = VectorAssembler(
-        inputCols=input_cols, outputCol=outputCol_name, handleInvalid="skip"
-    )
-    model_data = assembler.transform(data)
+    num_cols = dp.list_numerical_columns(data)
     if classification:
         from pyspark.ml.classification import RandomForestClassifier
+
         if target_var in cat_cols:
-            label = f"label_encoded_{target_var}"
+            data = data.withColumnRenamed(f"label_encoded_{target_var}", "target")
         else:
-            label = target_var
+            print(True)
+            data = data.withColumnRenamed(f"{target_var}", "target")
         rf = RandomForestClassifier(
-            numTrees=3, maxDepth=20, labelCol=label, featuresCol=outputCol_name, maxBins=bins, seed=42
+            numTrees=3, maxDepth=20, labelCol="target", maxBins=100, seed=42
         )
     else:
         from pyspark.ml.regression import RandomForestRegressor
-        label = target_var
+
+        data = data.withColumnRenamed(f"{target_var}", "target")
+        # Load model
         rf = RandomForestRegressor(
-            numTrees=3, maxDepth=20, labelCol=target_var, featuresCol=outputCol_name, maxBins=bins, seed=42
+            numTrees=3, maxDepth=20, labelCol="target", maxBins=100, seed=42
         )
 
-    model_data = model_data.select([outputCol_name, label])
+    if target_var in num_cols:
+        num_cols.remove(target_var)
+    elif f"label_encoded_{target_var}" in num_cols:
+        num_cols.remove(f"label_encoded_{target_var}")
+    assembler = VectorAssembler(
+        inputCols=num_cols, outputCol="features", handleInvalid="skip"
+    )
+    model_data = assembler.transform(data)
+    model_data = model_data.select(["features", "target"])
 
     # BUILD THE MODEL
     model = rf.fit(model_data)
 
     # FEATURE IMPORTANCES
     feature_importance = pd.DataFrame.from_dict(
-        dict(zip(input_cols, model.featureImportances.toArray())), orient="index"
+        dict(zip(num_cols, model.featureImportances.toArray())), orient="index"
     ).rename(columns={0: "Feature Importance"})
     feature_importance.sort_values(by="Feature Importance", inplace=True)
     plot = hvPlot(feature_importance).bar(
@@ -1559,7 +1019,7 @@ def feature_importance(data, target_var, classification=False):
 
 
 def feature_analysis_pca(data, target_var):
-    """Get feature importance dataframe based on RandomForestRegressor or RandomForestClassifier.
+    """Get feature importance based on RandomForestRegressor or RandomForestClassifier.
 
     Parameters
     ----------
@@ -1580,12 +1040,11 @@ def feature_analysis_pca(data, target_var):
         data = label_encode(data, cat_cols)
     num_cols = dp.list_numerical_columns(data)
     num_cols = [i for i in num_cols if i != target_var]
-    outputCol_name = custom_column_name("features", data.columns)
     assembler = VectorAssembler(
-        inputCols=num_cols, outputCol=outputCol_name, handleInvalid="skip"
+        inputCols=num_cols, outputCol="features", handleInvalid="skip"
     )
     model_data = assembler.transform(data)
-    pca = PCAml(k=2, inputCol=outputCol_name, outputCol=custom_column_name("pca", data.columns))
+    pca = PCAml(k=2, inputCol="features", outputCol="pca")
     model = pca.fit(model_data)
     transformed = model.transform(model_data)
     return transformed

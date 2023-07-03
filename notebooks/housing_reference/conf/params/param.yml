@@ -1,0 +1,11 @@
+parameters:
+      XGBoost :
+            gamma: [0.03]
+            min_child_weight: [6]
+            learning_rate: [0.1]
+            max_depth: [3]
+            n_estimators: [500]
+      
+
+      
+

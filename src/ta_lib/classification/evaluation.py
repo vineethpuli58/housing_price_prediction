@@ -36,11 +36,25 @@ def overlapping_histograms(dataset, col_idv, col_dv):
 
     plt.clf()
 
-    # majority = dataset[col_dv].value_counts(ascending=False).index[0]
-    # minority = dataset[col_dv].value_counts(ascending=True).index[0]
+    majority = dataset[col_dv].value_counts(ascending=False).index[0]
+    minority = dataset[col_dv].value_counts(ascending=True).index[0]
 
-    sns.displot(dataset, x=col_idv, hue=col_dv)
+    sns.distplot(
+        dataset[col_idv][dataset[col_dv] == majority].values,
+        hist=True,
+        kde=False,
+        color="red",
+        label=majority,
+    )
+    sns.distplot(
+        dataset[col_idv][dataset[col_dv] == minority].values,
+        hist=True,
+        kde=False,
+        color="blue",
+        label=minority,
+    )
     plt.grid(False)
+    plt.legend(loc="best")
     plt.title("Overlapping histogram of " + col_idv + " over " + col_dv, fontsize=15)
     plt.xlabel(col_idv, fontsize=13)
     plt.ylabel("Distribution", fontsize=13)
@@ -125,23 +139,31 @@ def confusion_matrix_by_feature(dataset, y_true, y_pred, col_idv, categorical=Tr
         dataset = pd.melt(dataset, id_vars=col_idv, value_vars=["TN", "TP", "FN", "FP"])
         dataset = dataset[dataset["value"] == 1]
 
-        sns.kdeplot(
+        sns.distplot(
             dataset[col_idv][dataset["variable"] == "TN"],
+            hist=False,
+            kde=True,
             color="red",
             label="TN",
         )
-        sns.kdeplot(
+        sns.distplot(
             dataset[col_idv][dataset["variable"] == "TP"],
+            hist=False,
+            kde=True,
             color="blue",
             label="TP",
         )
-        sns.kdeplot(
+        sns.distplot(
             dataset[col_idv][dataset["variable"] == "FN"],
+            hist=False,
+            kde=True,
             color="green",
             label="FN",
         )
-        sns.kdeplot(
+        sns.distplot(
             dataset[col_idv][dataset["variable"] == "FP"],
+            hist=False,
+            kde=True,
             color="black",
             label="FP",
         )

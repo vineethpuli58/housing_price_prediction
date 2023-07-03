@@ -23,7 +23,7 @@ from sklearn.base import (
     is_regressor,
 )
 from sklearn.datasets import (
-    fetch_california_housing,
+    load_boston,
     load_iris,
     make_blobs,
     make_multilabel_classification,
@@ -66,7 +66,7 @@ from sklearn.utils._testing import (
 )
 from sklearn.utils.validation import _num_samples, has_fit_parameter
 
-CALIFORNIA = None
+BOSTON = None
 CROSS_DECOMPOSITION = ["PLSCanonical", "PLSRegression", "CCA", "PLSSVD"]
 
 
@@ -446,15 +446,15 @@ def check_estimator(Estimator, generate_only=False):
             warnings.warn(str(exception), SkipTestWarning)
 
 
-def _housing_subset(n_samples=200):
-    global CALIFORNIA
-    if CALIFORNIA is None:
-        X, y = fetch_california_housing(return_X_y=True)
+def _boston_subset(n_samples=200):
+    global BOSTON
+    if BOSTON is None:
+        X, y = load_boston(return_X_y=True)
         X, y = shuffle(X, y, random_state=0)
         X, y = X[:n_samples], y[:n_samples]
         X = StandardScaler().fit_transform(X)
-        CALIFORNIA = X, y
-    return CALIFORNIA
+        BOSTON = X, y
+    return BOSTON
 
 
 @deprecated(
@@ -964,7 +964,7 @@ def check_dict_unchanged(name, estimator_orig):
 
     X = _pairwise_estimator_convert_X(X, estimator_orig)
 
-    y = X[:, 0].astype(int)
+    y = X[:, 0].astype(np.int)
     estimator = clone(estimator_orig)
     y = _enforce_estimator_tags_y(estimator, y)
     if hasattr(estimator, "n_components"):
@@ -1063,7 +1063,7 @@ def check_fit2d_predict1d(name, estimator_orig):
     rnd = np.random.RandomState(0)
     X = 3 * rnd.uniform(size=(20, 3))
     X = _pairwise_estimator_convert_X(X, estimator_orig)
-    y = X[:, 0].astype(int)
+    y = X[:, 0].astype(np.int)
     tags = estimator_orig._get_tags()
     estimator = clone(estimator_orig)
     y = _enforce_estimator_tags_y(estimator, y)
@@ -1151,7 +1151,7 @@ def check_fit2d_1sample(name, estimator_orig):
     X = 3 * rnd.uniform(size=(1, 10))
     X = _pairwise_estimator_convert_X(X, estimator_orig)
 
-    y = X[:, 0].astype(int)
+    y = X[:, 0].astype(np.int)
     estimator = clone(estimator_orig)
     y = _enforce_estimator_tags_y(estimator, y)
 
@@ -1189,7 +1189,7 @@ def check_fit2d_1feature(name, estimator_orig):
     rnd = np.random.RandomState(0)
     X = 3 * rnd.uniform(size=(10, 1))
     X = _pairwise_estimator_convert_X(X, estimator_orig)
-    y = X[:, 0].astype(int)
+    y = X[:, 0].astype(np.int)
     estimator = clone(estimator_orig)
     y = _enforce_estimator_tags_y(estimator, y)
 
@@ -1221,7 +1221,7 @@ def check_fit1d(name, estimator_orig):
     # check fitting 1d X array raises a ValueError
     rnd = np.random.RandomState(0)
     X = 3 * rnd.uniform(size=(20))
-    y = X.astype(int)
+    y = X.astype(np.int)
     estimator = clone(estimator_orig)
     tags = estimator._get_tags()
     if tags["no_validation"]:
@@ -1280,7 +1280,7 @@ def check_transformer_data_not_an_array(name, transformer):
 
 @ignore_warnings(category=FutureWarning)
 def check_transformers_unfitted(name, transformer):
-    X, y = _housing_subset()
+    X, y = _boston_subset()
 
     transformer = clone(transformer)
     with assert_raises(

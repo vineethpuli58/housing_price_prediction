@@ -31,7 +31,7 @@ SCORING_OPTIONS = DictObject(
             "f1_score": {
                 "string": "f1_score",
                 "func": f1_score,
-                "default_params": {"average": "weighted", "zero_division": 0},
+                "default_params": {"average": "weighted"},
                 "more_is_better": True,
                 "format": table_styles.percentage_format,
                 "round": 4,
@@ -45,7 +45,7 @@ SCORING_OPTIONS = DictObject(
             "precision": {
                 "string": "precision",
                 "func": precision_score,
-                "default_params": {"average": "weighted", "zero_division": 0},
+                "default_params": {"average": "weighted"},
                 "more_is_better": True,
                 "format": table_styles.percentage_format,
                 "round": 4,
@@ -53,7 +53,7 @@ SCORING_OPTIONS = DictObject(
             "recall": {
                 "string": "recall",
                 "func": recall_score,
-                "default_params": {"average": "weighted", "zero_division": 0},
+                "default_params": {"average": "weighted"},
                 "more_is_better": True,
                 "format": table_styles.percentage_format,
                 "round": 4,

@@ -86,12 +86,10 @@ class ModelFeatureImportance:
             if algo_object.is_classification(self.algo):
                 cv = cv or StratifiedKFold(n_splits=5)
                 score = score or "roc_auc"
-                model = LogisticRegressionCV(
-                    solver="lbfgs", cv=cv, scoring=score, max_iter=15000
-                )
+                model = LogisticRegressionCV(solver="lbfgs", cv=cv, scoring=score)
             elif algo_object.is_classification(self.algo) is False:
                 cv = cv or 5
-                model = LassoCV(cv=cv, max_iter=30000)
+                model = LassoCV(cv=cv)
                 score = score or "neg_mean_absolute_error"
             else:
                 raise Exception(
@@ -100,9 +98,7 @@ class ModelFeatureImportance:
         if "sklstatsmodellogit" in str(model).lower():
             cv = cv or StratifiedKFold(n_splits=5)
             score = score or "roc_auc"
-            model = LogisticRegressionCV(
-                solver="lbfgs", cv=cv, scoring=score, max_iter=15000
-            )
+            model = LogisticRegressionCV(solver="lbfgs", cv=cv, scoring=score)
         self.model = model
         self.estimator = model
 

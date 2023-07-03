@@ -39,7 +39,7 @@ def check_y(y):
     """Change anything to array."""
     if hasattr(y, ("__array__")):
         y = y.__array__()
-        return np.array(y, dtype=float)
+        return np.array(y, dtype=np.float)
     elif isinstance(y, (list, tuple)):
         return np.array(y)
     else:
@@ -171,7 +171,7 @@ class WoeBinningTransformer(BaseEstimator, TransformerMixin):
             Array of feature names.
         """
         if "onehot" in self.encode:
-            return self._encoder.get_feature_names_out(self.encode_cols_)
+            return self._encoder.get_feature_names(self.encode_cols_)
         else:
             return self.encode_cols_
 

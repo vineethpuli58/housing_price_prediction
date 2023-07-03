@@ -414,18 +414,15 @@ class ClassificationComparison(MultiModelReport, ClassificationComparisonMixin):
         excel_params : dict
             Dictionary containing the following keys if the format is ".xlsx".
             If a key is not provided, it will take the default values.
-
-                - have_plot : boolean; default False.
-                    If True, keep the plots in image format in excel report.
-                - n_rows : int; default 100.
-                    Number of sample rows to keep for plot types containing all the records in data (for example, density plot, scatter plot etc.)
+            - have_plot : boolean; default False.
+              If True, keep the plots in image format in excel report.
+            - n_rows : int; default 100.
+              Number of sample rows to keep for plot types containing all the records in data (for example, density plot, scatter plot etc.)
         """
         if not file_path:
             file_path = f'classification_comparison_report_at_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}'
 
-        super()._get_report(
-            file_path=file_path, cutoff_value=cutoff_value, format=format, **kwargs
-        )  # noqa
+        super()._get_report(file_path=file_path, cutoff_value=cutoff_value, format=format, **kwargs)  # noqa
 
 
 class RegressionComparison(MultiModelReport, RegressionComparisonMixin):
@@ -466,9 +463,9 @@ class RegressionComparison(MultiModelReport, RegressionComparisonMixin):
     >>> from tigerml.model_eval import RegressionComparison
     >>> from sklearn.linear_model import LinearRegression
     >>> from sklearn.ensemble import RandomForestRegressor
-    >>> from sklearn.datasets import fetch_california_housing
+    >>> from sklearn.datasets import load_boston
     >>> from sklearn.model_selection import train_test_split
-    >>> X, y = fetch_california_housing(return_X_y=True)
+    >>> X, y = load_boston(return_X_y=True)
     >>> X_train, X_test, y_train, y_test = train_test_split(X, y , test_size=0.33, random_state=42)
     >>> # Model 1 - Linear Regression
     >>> lr = LinearRegression().fit(X_train, y_train)
@@ -510,11 +507,10 @@ class RegressionComparison(MultiModelReport, RegressionComparisonMixin):
         excel_params : dict
             Dictionary containing the following keys if the format is ".xlsx".
             If a key is not provided, it will take the default values.
-
-                - have_plot : boolean; default False.
-                    If True, keep the plots in image format in excel report.
-                - n_rows : int; default 100.
-                    Number of sample rows to keep for plot types containing all the records in data (for example, density plot, scatter plot etc.)
+            - have_plot : boolean; default False.
+              If True, keep the plots in image format in excel report.
+            - n_rows : int; default 100.
+              Number of sample rows to keep for plot types containing all the records in data (for example, density plot, scatter plot etc.)
 
         """
         if not file_path:

@@ -3,8 +3,7 @@ from sklearn.utils.estimator_checks import (
     check_estimator,
     parametrize_with_checks,
 )
-
-from tigerml.core.preprocessing.feature_engg.transformers import (
+from tigerml.feature_engg.transformers import (
     SupervisedTransformer,
     UnsupervisedTransformer,
     WoeBinningTransformer,

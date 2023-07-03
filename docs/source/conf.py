@@ -23,8 +23,8 @@ os.environ["PYTHONPATH"] = ":".join((LIB_PKG_PATH, os.environ.get("PYTHONPATH", 
 
 # -- Project information -----------------------------------------------------
 
-project = "Project_X"
-copyright = "2020, Tiger Analytics"
+project = "Housing Price Prediction"
+copyright = "2023, Tiger Analytics"
 author = "Tiger Analytics"
 
 

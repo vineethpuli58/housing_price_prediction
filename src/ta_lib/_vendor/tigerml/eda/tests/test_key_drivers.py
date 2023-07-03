@@ -7,7 +7,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis.strategies import composite, floats, integers, sampled_from
 from sklearn.datasets import (
-    fetch_california_housing,
+    load_boston,
     load_breast_cancer,
     make_classification,
     make_regression,
@@ -131,7 +131,7 @@ def test_feature_scores_cat(test_df):
 # @settings(max_examples=10, deadline=None)
 # @given(regression_data())
 def test_feature_importances_cont():
-    X = fetch_california_housing()
+    X = load_boston()
     test_df = pd.DataFrame(X.data, columns=X.feature_names)
     test_df["MEDV"] = X.target
     analyser = Analyser(test_df, y="MEDV")

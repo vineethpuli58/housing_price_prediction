@@ -1,6 +1,6 @@
-# Sales price prediction
+# Housing price prediction
 
-Use regression to predict price of electronic devices
+Use regression to predict price of house
 
 Tip: If you don't have markdown viewer like atom, you can render this on chrome by following [this link](https://imagecomputing.net/damien.rohmer/teaching/general/markdown_viewer/index.html).
 
@@ -26,11 +26,14 @@ Tip: If you don't have markdown viewer like atom, you can render this on chrome 
         %LOCALAPPDATA%\GitHubDesktop\app-<ver>\resources\app\git\mingw64\bin\git.exe
 ```
 
-* Ensure [invoke](http://www.pyinvoke.org/index.html) tool and pyyaml are installed in your `base` `conda` environment. If not, run
+* Ensure [invoke](http://www.pyinvoke.org/index.html) and [radon](https://radon.readthedocs.io/en/latest/) tool and pyyaml are installed in your `base` `conda` environment. If not, run
+
 
 ```
 (base):~$ pip install invoke
 (base):~$ pip install pyyaml
+(base):~$ pip install radon
+(base):~$ pip install nbformat
 ```
 
 # Getting started
@@ -83,51 +86,41 @@ and check no error messages (`Error: ...`) are printed.
 
 Run below to install core libraries
 ```
-(base):~/<proj-folder>$ inv dev.setup-env --usecase=<specific usecase>
+(base):~/<proj-folder>$ inv dev.setup-env
 ```
-
-The above command should create a conda python environment named `ta-lib-dev` and install the code in the current repository along with all required dependencies.
-
-`usecase` parameter above is an optional parameter. It takes a value of `tpo` or `mmx`.
-dev.setup-env in itself will only install the core libs required but when you have to work
-with specific use case (e.g MMX or TPO, etc.), one has to install the libraries required for
-these specific use cases. So when we provide the `usecase` option, we are specifying that we
-want that dependencies for this use case installed in our environment as well.
 
 Activate the environment first to install other addons. Keep the environment active for all the remaining commands in the manual.
 ```
-(base):~/<proj-folder>$ conda activate ta-lib-dev
+(base):~/<proj-folder>$ conda activate capstone-dev
 ```
 
 Install `invoke` and `pyyaml` in this env to be able to install the addons in this environment.
 ```
-(ta-lib-dev):~/<proj-folder>$ pip install invoke
+(capstone-dev):~/<proj-folder>$ pip install invoke
+(capstone-dev):~/<proj-folder>$ pip install pyyaml
 ```
 
 Now run all following command to install all the addons. Feel free to customize addons as suggested in the introduction.
 
 ```
-(ta-lib-dev):~/<proj-folder>$ inv dev.setup-addon --formatting --jupyter --documentation --testing --extras --ts
+(capstone-dev):~/<proj-folder>$ inv dev.setup-addon --formatting --jupyter --documentation --testing --extras --ts --pyspark
 ```
 
 You now should have a standalone conda python environment and installed code in the current repository along with all required dependencies.
 
 * Get the installation info by running
 ```
-(ta-lib-dev):~/<proj-folder>$ inv dev.info
+(capstone-dev):~/<proj-folder>$ inv dev.info
 ```
 
 * Test your installation by running
 ```
-(ta-lib-dev):~/<proj-folder>$ inv test.val-env --usecase=<specific usecase>
+(capstone-dev):~/<proj-folder>$ inv test.val-env
 ```
-
-We need to specify the usecase to validate the environment for core as well as usecase specific dependencies.
-
 * This will just check the core setup, i.e, the env setup by inv dev.setup-env
 * To check the addon installation in the conda env, we check it by specifying the specific addon like
 ```
-(ta-lib-dev):~/<proj-folder>$ inv test.val-env --formatting --jupyter --documentation --testing --extras --ts --pyspark
+(capstone-dev):~/<proj-folder>$ inv test.val-env --formatting --jupyter --documentation --testing --extras --ts --pyspark
 ```
 * You can specify which addon's installation you want to check here.
 
@@ -136,13 +129,13 @@ We need to specify the usecase to validate the environment for core as well as u
 - In order to launch a jupyter notebook locally in the web server, run
 
     ```
-    (ta-lib-dev):~/<proj-folder>$ inv launch.jupyterlab
+    (capstone-dev):~/<proj-folder>$ inv launch.jupyterlab
     ```
      After running the command, type [localhost:8080](localhost:8080) to see the launched JupyterLab.
 
 - The `inv` command has a built-in help facility available for each of the invoke builtins. To use it, type `--help` followed by the command:
     ```
-    (ta-lib-dev):~/<proj-folder>$ inv launch.jupyterlab --help
+    (capstone-dev):~/<proj-folder>$ inv launch.jupyterlab --help
     ```
 - On running the ``help`` command, you get to see the different options supported by it.
 

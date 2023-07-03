@@ -14,10 +14,7 @@ from .base import (
     RegressionReport,
 )
 from .comparison import ClassificationComparison, RegressionComparison
-from .multi_model import (
-    MultiModelComparisonClassification,
-    MultiModelComparisonRegression,
-)
+from .multi_model import MultiModelComparisonRegression
 from .plotters import *
 from .segmented import ClassificationSegmentedReport, RegressionSegmentedReport
 

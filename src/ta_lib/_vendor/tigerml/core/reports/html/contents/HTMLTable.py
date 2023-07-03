@@ -32,7 +32,7 @@ class HTMLTable(Table):
                     self.styler.background_gradient(
                         subset=rule["rows"], cmap=rule["style"], axis=1
                     )
-        html_str = '<div class="content_inner">{}</div>'.format(self.styler.to_html())
+        html_str = '<div class="content_inner">{}</div>'.format(self.styler.render())
         return '<div class="content table_content {}">{}</div>'.format(
             "apply_datatable" if self.datatable else "no_datatable", html_str
         )

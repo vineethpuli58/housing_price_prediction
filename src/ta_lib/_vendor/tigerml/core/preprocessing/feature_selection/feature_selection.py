@@ -45,23 +45,23 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
     estimator: object
         The base estimator from which the transformer is built.
 
-            - If selection_type is recursion, any estimator can be used.
-            - If selection_type is regularization, Lasso/Ridge estimator
-              should be passed.
+        - If selection_type is recursion, any estimator can be used.
+        - If selection_type is regularization, Lasso/Ridge estimator
+        should be passed.
 
     selection_type: {"recursion","regularization"} str, default = "recursion".
         Method used to select features
 
-            - If recursion, Forward or backward selection is used and
-              selection_params has to be passed.
-            - If regularization, Lasso or Ridge regression is used.
+        - If recursion, Forward or backward selection is used and
+          selection_params has to be passed.
+        - If regularization, Lasso or Ridge regression is used.
 
     selection_params: dict, default = {'forward':False,verbose:False,k_features:'best'}
         params associated with class `SequentialFeatureSelector` in
         the form {forward: bool, verbose: bool,k_features: no_of_features}
 
-            - If forward parameter is True, then forward feature selection
-              is used else, backward feature elimination method is used.
+        - If forward parameter is True, then forward feature selection
+          is used else, backward feature elimination method is used.
 
     x_train: dataframe
         dataframe for train data
@@ -224,7 +224,6 @@ class FeatureSelectorStatistic(SelectKBest):
                 "corr_coef", "corr_ratio",
                 "cramer_v", "f_score",
                 "mutual_value", "woe_iv"} str, default = "f_score".
-
         The statistic which will be used to select the top k columns.
 
     k: int, optional, default=2

@@ -727,8 +727,8 @@ class ModelDrift(BaseDrift):
         """
         Get set difference for categorical features.
 
-        Parameters
-        ----------
+        Paramters
+        ---------
         diff_only: bool, default=True
             If set to true returns only rows where difference is.
 

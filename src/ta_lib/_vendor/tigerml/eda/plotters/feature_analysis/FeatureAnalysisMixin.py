@@ -32,17 +32,7 @@ def _get_non_null_samples(series, NA_VALUES):
     unique_values = (
         series.unique().head(10) if is_dask(series) else series.unique()[:10]
     )
-
-    samples = []
-    for x in unique_values:
-        flag = False
-        for y in NA_VALUES:
-            if x is y:
-                flag = True
-        if not flag:
-            samples.append(x)
-    samples = samples[:5]
-
+    samples = [x for x in unique_values if x not in NA_VALUES][:5]
     if samples:
         return samples
     else:

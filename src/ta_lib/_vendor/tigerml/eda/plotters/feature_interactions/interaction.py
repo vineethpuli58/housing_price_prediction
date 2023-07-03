@@ -57,7 +57,7 @@ def get_bivariate_plot(df, dtypes, corr_df, x_var, y_var):
                 data[col]
                 .value_counts()
                 .sort_values(ascending=False)
-                .head(MAX_CAT_LEVELS)
+                .head(20)
                 .index.tolist()
             )
             other_levels = (
@@ -65,7 +65,7 @@ def get_bivariate_plot(df, dtypes, corr_df, x_var, y_var):
             )
             others_placeholder = f"Others ({len(other_levels)} levels)"
             if str(data[col].dtype) == "category":
-                data[col] = data[col].cat.add_categories(others_placeholder)
+                data[col].cat.add_categories(others_placeholder, inplace=True)
             data[col][~detigerify(data[col].isin(top_levels))] = others_placeholder
             data[col] = data[col].astype(str)
         if dtypes[col] == "bool":

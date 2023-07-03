@@ -2,24 +2,31 @@
 """
 Created on Thu Sep 20 02:43:13 2018.
 
-@author: kapil.kumar3290
+@author: ranjith.a
 """
 
-import copy
 import json
 import os
 
-json_path = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(json_path, "conf.json")) as json_data_file:
+with open("conf.json") as json_data_file:
     data = json.load(json_data_file)
 
-dafault_config = copy.deepcopy(data)
-
-# algorithms = dafault_config["algorithms"]
-# validation_hyperparams = dafault_config["validation_hyperparams"]
-# model_hyperparams = dafault_config["model_hyperparams"]
-# perf_metrics = dafault_config["performance_metrics"]
-
+algorithms = data["default"]["algorithms"]
+data_location = data["default"]["data_location"]
+idv_variable_names = data["default"]["idv_variable_names"]
+#
+hyperparams_simpleexponentialsmoothing = data["hyperparams"][
+    "SimpleExponentialSmoothing"
+]
+hyperparams_exponentialsmoothingholt = data["hyperparams"]["ExponentialSmoothingHolt"]
+hyperparams_exponentialsmoothingholtwinters = data["hyperparams"][
+    "ExponentialSmoothingHoltWinters"
+]
+hyperparams_sarimax = data["hyperparams"]["SARIMAX"]
+hyperparams_lstmseqtoseqmultivariate = data["hyperparams"]["LSTMSeqToSeqMultivariate"]
+#
+perf_metrics = data["default"]["performance_metrics"]
+dv_variable_name = data["default"]["dv_variable_name"]
 
 # creating an output folder for model results and saved models
 code_output_path = os.getcwd()

@@ -17,9 +17,6 @@ These test cases are not part of CI build and hence are to be explicitly run by 
         $ cd python/tigerml/pyspark/dev_tests
     ```
 
-- Place your csv files under data folder in dev_tests
-
-
 - Use the below commands one by one to run the test cases
 
     ```

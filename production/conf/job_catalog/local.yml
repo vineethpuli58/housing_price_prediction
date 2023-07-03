@@ -37,6 +37,13 @@ jobs:
           - name: "train-model"
             params:
               sampling_fraction: 0.1
+  - name: param_tuning
+    stages:
+      - name: "hyper_tuning"
+        tasks:
+          - name: "hyper_tuning"
+            params:
+              hyperparam: RandomForest
 
   - name: model-eval
     stages:

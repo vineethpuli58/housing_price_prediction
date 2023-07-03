@@ -128,10 +128,6 @@ class KeyDriversMixin:
     def feature_importances(self, y=None, features=None, quick=False):
         """Return model `feature importances` for IDVs.
 
-        Following Scikit-learn models are used as baseline models to calculate feature importances:
-        1. Classification:  LogisticRegressionCV
-        2. Regression: LassoCV
-
         Parameters
         ----------
         y : pd.Series, default : `None`
@@ -312,11 +308,7 @@ class KeyDriversMixin:
     ):
         """Univariate analysis for the columns.
 
-        Generate summary_stats, distributions, feature importances and normality tests for columns.
-
-        Following Scikit-learn models are used as baseline models to calculate feature importances:
-        1. Classification:  LogisticRegressionCV
-        2. Regression: LassoCV
+        Generate summary_stats, distributions and normality tests for columns.
 
         Parameters
         ----------

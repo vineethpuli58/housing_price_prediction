@@ -773,9 +773,9 @@ class RegressionReport(ModelReport):
     --------
     >>> from tigerml.model_eval import RegressionReport
     >>> from sklearn.linear_model import LinearRegression
-    >>> from sklearn.datasets import fetch_california_housing
+    >>> from sklearn.datasets import load_boston
     >>> from sklearn.model_selection import train_test_split
-    >>> X, y = fetch_california_housing(return_X_y=True)
+    >>> X, y = load_boston(return_X_y=True)
     >>> X = pd.DataFrame(X, columns= ['CRIM','ZN','INDUS','CHAS','NOX','RM','AGE','DIS','RAD','TAX','PTRATIO','B','LSTAT'])
     >>> X_train, X_test, y_train, y_test = train_test_split(X, y , test_size=0.33, random_state=42)
     >>> reg = LinearRegression().fit(X_train, y_train)
@@ -859,7 +859,7 @@ class RegressionReport(ModelReport):
 
         The generated report would have matrices values and prediction results under model performance section and
         feature importance under model interpretation section. If shap support is included (include_shap=True) then it
-        will include shap values based feature importance, dependence plots and prediction error plots in the report. Refer `SHAP Interpretation <https://tigeranalytics-code-templates.readthedocs-hosted.com/projects/tigerml/en/latest/tigerml/model_eval.html#shap-baseline-ref>`__ for more information.
+        will include shap values based feature importance, dependence plots and prediction error plots in the report. Refer :ref:`shap-baseline-ref` for more information.
 
         It save the final report in the format and at location as specified by the user.
 
@@ -886,11 +886,10 @@ class RegressionReport(ModelReport):
         excel_params : dict
             Dictionary containing the following keys if the format is ".xlsx".
             If a key is not provided, it will take the default values.
-
-                - have_plot : boolean; default False.
-                    If True, keep the plots in image format in excel report.
-                - n_rows : int; default 100.
-                    Number of sample rows to keep for plot types containing all the records in data (for example, density plot, scatter plot etc.)
+            - have_plot : boolean; default False.
+              If True, keep the plots in image format in excel report.
+            - n_rows : int; default 100.
+              Number of sample rows to keep for plot types containing all the records in data (for example, density plot, scatter plot etc.)
         """
         if not file_path:
             file_path = "regression_report_at_{}".format(
@@ -1219,7 +1218,7 @@ class ClassificationReport(ModelReport):
 
         The generated report would have matrices values and prediction results under model performance section and
         feature importance under model interpretation section. If shap support is included (include_shap=True) then it
-        will include shap values based feature importance, dependence plots and prediction error plots in the report. Refer `SHAP Interpretation <https://tigeranalytics-code-templates.readthedocs-hosted.com/projects/tigerml/en/latest/tigerml/model_eval.html#shap-baseline-ref>`__ for more information.
+        will include shap values based feature importance, dependence plots and prediction error plots in the report. Refer :ref:`shap-baseline-ref` for more information.
 
         It save the final report in the format and at location as specified by the user.
 
@@ -1245,11 +1244,10 @@ class ClassificationReport(ModelReport):
         excel_params : dict
             Dictionary containing the following keys if the format is ".xlsx".
             If a key is not provided, it will take the default values.
-
-                - have_plot : boolean; default False.
-                    If True, keep the plots in image format in excel report.
-                - n_rows : int; default 100.
-                    Number of sample rows to keep for plot types containing all the records in data (for example, density plot, scatter plot etc.)
+            - have_plot : boolean; default False.
+              If True, keep the plots in image format in excel report.
+            - n_rows : int; default 100.
+              Number of sample rows to keep for plot types containing all the records in data (for example, density plot, scatter plot etc.)
         """
         if not file_path:
             file_path = "classification_report_at_{}".format(

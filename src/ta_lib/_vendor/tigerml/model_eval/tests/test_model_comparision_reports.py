@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import warnings
-from sklearn.datasets import fetch_california_housing, load_breast_cancer
+from sklearn.datasets import load_boston, load_breast_cancer
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.model_selection import train_test_split
@@ -14,9 +14,9 @@ warnings.filterwarnings("ignore")
 
 def regression_data():
     """Get regression data."""
-    california = fetch_california_housing()
-    X = pd.DataFrame(california["data"], columns=california["feature_names"])
-    y = california["target"]
+    boston = load_boston()
+    X = pd.DataFrame(boston["data"], columns=boston["feature_names"])
+    y = boston["target"]
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.33, random_state=42
     )

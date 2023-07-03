@@ -7,9 +7,14 @@ import numpy as np
 import pandas as pd
 from functools import reduce
 from hvplot import hvPlot
-from sklearn.metrics import auc, average_precision_score, classification_report
-from sklearn.metrics import confusion_matrix as sklearn_cm
-from sklearn.metrics import precision_recall_curve, roc_curve
+from sklearn.metrics import (
+    auc,
+    average_precision_score,
+    classification_report,
+    confusion_matrix,
+    precision_recall_curve,
+    roc_curve,
+)
 from tigerml.core.reports import format_tables_in_report
 from tigerml.core.scoring import SCORING_OPTIONS, TEST_PREFIX, TRAIN_PREFIX
 from tigerml.core.utils._lib import fail_gracefully, flatten_list
@@ -423,9 +428,8 @@ def compute_threshold_data(y, yhat, metrics_dict=None):
         plot_data["% of Class 1"].append(predict_class.mean())
         for key_ in ["precision", "recall", "f1_score"]:
             func = metrics_dict[key_]["func"]
-            default_params = metrics_dict[key_].get("default_params", {})
             train_params = [y, predict_class]
-            plot_data[key_].append(func(*train_params, **default_params))
+            plot_data[key_].append(func(*train_params))
 
     plot_data = pd.DataFrame(plot_data)
     return plot_data
@@ -616,30 +620,30 @@ class ClassificationEvaluation(Evaluator):
         return train_plot
 
     def _compute_cm(self, y_true, y_pred, return_df=True):
-        cm = sklearn_cm(y_true, y_pred)
+        cm = confusion_matrix(y_true, y_pred)
         if not return_df:
             return cm
-        cm_df = pd.DataFrame(cm)
+        cm_df = pd.DataFrame(cm).T
         if self.multi_class:
             cm_df.rename(
                 columns={
-                    i: "Predicted_" + self.display_labels[i]
-                    for i in self.display_labels
+                    i: "Actual_" + self.display_labels[i] for i in self.display_labels
                 },
                 inplace=True,
             )
             cm_df.rename(
                 index={
-                    i: "Actual_" + self.display_labels[i] for i in self.display_labels
+                    i: "Predicted_" + self.display_labels[i]
+                    for i in self.display_labels
                 },
                 inplace=True,
             )
         else:
             cm_df.rename(
-                columns={c: "Predicted_" + str(c) for c in cm_df.columns}, inplace=True
+                columns={c: "Actual_" + str(c) for c in cm_df.columns}, inplace=True
             )
             cm_df.rename(
-                index={i: "Actual_" + str(i) for i in cm_df.index}, inplace=True
+                index={i: "Predicted_" + str(i) for i in cm_df.index}, inplace=True
             )
         cm_df = cm_df.reset_index().rename(columns={"index": "#"})
         return cm_df

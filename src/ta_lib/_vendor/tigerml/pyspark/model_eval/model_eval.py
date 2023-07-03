@@ -18,7 +18,7 @@ from pyspark.sql import types as DT
 from pyspark_dist_explore import hist
 from tigerml.core.reports import create_report
 
-from ..core.dp import custom_column_name, identify_col_data_type
+from ..core.dp import identify_col_data_type
 from .handy_spark_cd import (
     BinaryClassificationMetrics as CustomBinaryClassificationMetrics,
 )
@@ -175,11 +175,9 @@ def get_regression_plots(
         dictionary with plot names as key and plots as values
     """
     plots_dict = {}
-    custom_residual = custom_column_name("residual", data.columns)
-    custom_forecast_flag = custom_column_name("forecast_flag", data.columns)
-    data = data.withColumn(custom_residual, F.col(y_pred_col) - F.col(y_col))
+    data = data.withColumn("residual", F.col(y_pred_col) - F.col(y_col))
     data = data.withColumn(
-        custom_forecast_flag,
+        "forecast_flag",
         F.when((F.col(y_pred_col) > (1 + threshold) * F.col(y_col)), "Above threshold")
         .when((F.col(y_pred_col) < (1 - threshold) * F.col(y_col)), "Below threshold")
         .otherwise("Within threshold"),
@@ -187,7 +185,7 @@ def get_regression_plots(
 
     # Residual Distribution Plot
     fig, ax = plt.subplots()
-    hist(ax, [data.select(custom_residual)], bins=20)
+    hist(ax, [data.select("residual")], bins=20)
     ax.set_title("Residual Histogram")
     plots_dict["Residual Histogram"] = plt.gcf()
 
@@ -197,7 +195,7 @@ def get_regression_plots(
         "Above threshold": "royalblue",
         "Below threshold": "darkorange",
     }.items():
-        plot_df = data.filter((F.col(custom_forecast_flag) == k))
+        plot_df = data.filter((F.col("forecast_flag") == k))
         x = plot_df.select(y_col).collect()
         y = plot_df.select(y_pred_col).collect()
         ax.scatter(x=x, y=y, label=k, color=v, s=10)
@@ -213,9 +211,9 @@ def get_regression_plots(
         "Above threshold": "royalblue",
         "Below threshold": "darkorange",
     }.items():
-        plot_df = data.filter((F.col(custom_forecast_flag) == k))
+        plot_df = data.filter((F.col("forecast_flag") == k))
         x = plot_df.select(y_pred_col).collect()
-        y = plot_df.select(custom_residual).collect()
+        y = plot_df.select("residual").collect()
         ax.scatter(x=x, y=y, label=k, color=v, s=10)
     ax.set_xlabel(y_pred_col)
     ax.set_ylabel("Residual")
@@ -229,9 +227,7 @@ def get_regression_plots(
             nrows=len(feature_cols), ncols=1, figsize=(18, 6 * len(feature_cols))
         )
         for idx, feature in enumerate(feature_cols):
-            axs[idx] = plot_interaction(
-                spark, data, feature, custom_residual, ax=axs[idx]
-            )
+            axs[idx] = plot_interaction(spark, data, feature, "residual", ax=axs[idx])
             axs[idx].set_title(f"Interaction of {feature} with Residual")
         plots_dict["Feature Plots"] = [plt.gcf()]
 
@@ -284,19 +280,16 @@ def get_classification_scores(
             "probabilities (probability_col) or classes (y_pred_col)."
         )
     if probability_col is not None:
-        proboScoreAndLabels = data.select(probability_col, y_col).rdd.map(
+        scoreAndLabels = data.select(probability_col, y_col).rdd.map(
             lambda row: (float(row[probability_col][1]), float(row[y_col]))
         )
-        scoreAndLabels = proboScoreAndLabels.map(
-            lambda t: (float(t[0] > threshold), t[1])
-        )
+        scoreAndLabels = scoreAndLabels.map(lambda t: (float(t[0] > threshold), t[1]))
     else:
         scoreAndLabels = data.select(y_pred_col, y_col).rdd.map(
             lambda row: (float(row[y_pred_col]), float(row[y_col]))
         )
-        proboScoreAndLabels = scoreAndLabels
     conf_matrix = MulticlassMetrics(scoreAndLabels).confusionMatrix().toArray()
-    binary_cls_obj = BinaryClassificationMetrics(proboScoreAndLabels)
+    binary_cls_obj = BinaryClassificationMetrics(scoreAndLabels)
     auROC = binary_cls_obj.areaUnderROC
     auPR = binary_cls_obj.areaUnderPR
     return conf_matrix, auROC, auPR
@@ -419,10 +412,8 @@ def get_binary_classification_plots(
 
     # Confusion Matrix
     cm_df = pd.DataFrame(conf_matrix)
-    cm_df.rename(
-        columns={c: "Predicted_" + str(c) for c in cm_df.columns}, inplace=True
-    )
-    cm_df.rename(index={i: "Actual_" + str(i) for i in cm_df.index}, inplace=True)
+    cm_df.rename(columns={c: "Actual_" + str(c) for c in cm_df.columns}, inplace=True)
+    cm_df.rename(index={i: "Predicted_" + str(i) for i in cm_df.index}, inplace=True)
     cm_df = cm_df.reset_index().rename(columns={"index": "#"})
     plots_dict["Confusion Matrix"] = cm_df
 
@@ -502,11 +493,10 @@ def generate_confusion_cell_col(
     _get_label = F.udf(_get_label, DT.DoubleType())
     _get_conf_cell = F.udf(_get_conf_cell, DT.StringType())
 
-    custom_pred_label = custom_column_name("pred_label", data.columns)
     if probability_col is not None:
-        data = data.withColumn(custom_pred_label, _get_label(F.col(probability_col)))
+        data = data.withColumn("pred_label", _get_label(F.col(probability_col)))
         data = data.withColumn(
-            confusion_cell_col, _get_conf_cell(F.col(custom_pred_label), F.col(y_col))
+            confusion_cell_col, _get_conf_cell(F.col("pred_label"), F.col(y_col))
         )
     else:
         data = data.withColumn(
@@ -992,11 +982,11 @@ class RegressionReport(PySparkReport):
 
     There are two options available:
 
-        * Option 1: Using model object.
-            - Must have pyspark model object (model), train data (train_df) and target column name (label_Col).
-        * Option 2: Using predictors
-            - Must have train data (train_df) which should have target column (label_Col), features column (features_Col)
-              and prediction column (prediction_Col)
+    * Option 1: Using model object.
+        - Must have pyspark model object (model), train data (train_df) and target column name (label_Col).
+    * Option 2: Using predictors
+        - Must have train data (train_df) which should have target column (label_Col), features column (features_Col)
+        and prediction column (prediction_Col)
 
     Parameters
     ----------
@@ -1029,11 +1019,11 @@ class RegressionReport(PySparkReport):
     >>> import pandas as pd
     >>> from pyspark.sql import SparkSession
     >>> from pyspark.ml.regression import RandomForestRegressor
-    >>> from sklearn.datasets import fetch_california_housing
+    >>> from sklearn.datasets import load_boston
     >>> from tigerml.pyspark.model_eval import RegressionReport
     >>> from tigerml.pyspark.dp import test_train_split
     >>> spark = SparkSession.builder.appName('model_eval_regression').getOrCreate()
-    >>> data = fetch_california_housing()
+    >>> data = load_boston()
     >>> X = pd.DataFrame(data['data'], columns=data['feature_names'])
     >>> y = pd.DataFrame(data['target'], columns=['Target'])
     >>> df = spark.createDataFrame(pd.concat([X,y], axis=1))
@@ -1122,11 +1112,11 @@ class ClassificationReport(PySparkReport):
 
     There are two options available:
 
-        * Option 1: Using model object.
-            - Must have pyspark model object (model), train data (train_df) and target column name (label_Col).
-        * Option 2: Using predictors
-            - Must have train data (train_df) which should have target column (label_Col), features column (features_Col)
-              and one of predicted class column (prediction_Col) or predicted probabilities column (probability_col)
+    * Option 1: Using model object.
+        - Must have pyspark model object (model), train data (train_df) and target column name (label_Col).
+    * Option 2: Using predictors
+        - Must have train data (train_df) which should have target column (label_Col), features column (features_Col)
+        and one of predicted class column (prediction_Col) or predicted probabilities column (probability_col)
 
     Parameters
     ----------

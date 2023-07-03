@@ -4,25 +4,24 @@ class Outlier:
     Parameters
     ----------
     method: str, default is percentile.
-        Accepted values are mean, median, percentile and threshold.
-        The method that is used to determine the upper/lower bounds.
-
-            * If percentile - bounds are quantiles (0-1).
-                Default bounds are (0.01, 0.99)
-            * If mean - bounds are no. of standard deviations from mean.
-                Default bounds are (3, 3)
-            * If median - bounds are no. of IQRs away from median.
-                Default bounds are  (1.5, 1.5)
-            * If threshold - Fixed values for outlier identification
-                should be provided through lb and/or ub variables. No default bounds.
+        Accepted values are mean, median, percentile and threshold
+        The method that is used to determine the upper/lower bounds
+        * If percentile - bounds are quantiles (0-1).
+          Default bounds are (0.01, 0.99)
+        * If mean - bounds are no. of standard deviations from mean.
+          Default bounds are (3, 3)
+        * If median - bounds are no. of IQRs away from median.
+          Default bounds are  (1.5, 1.5)
+        * If threshold - Fixed values for outlier identification
+          should be provided through lb and/or ub variables. No default bounds.
     lb: dict, default is none
         lb is the lower bound
         * If not None, pass a dictionary of columns
-        with custom lower limits for each
+         with custom lower limits for each
     ub: dict, default is none
         ub is the upper bound
         * If not None, pass a dictionary of columns
-        with custom upper limits for each
+         with custom upper limits for each
     """
 
     def __init__(
@@ -207,30 +206,3 @@ class Outlier:
         for (col, ub) in self.ub.items():
             outlier_nums[col][1] = (df[col] > ub).sum()
         return outlier_nums
-
-    def get_outlier_indexes(self, df):
-        """Return a dictionary containing outlier indexes for each columns in df.
-
-        Parameters
-        ----------
-        df: pd.DataFrame
-            Data for which outlier index information is required.
-
-        Returns
-        -------
-        outlier_indexes: dict
-            key -- column name
-            value -- list of outlier indexes
-        """
-        outlier_indexes = {}
-        for col in df.columns:
-            outlier_indexes[col] = list([])
-        for (col, lb) in self.lb.items():
-            outlier_list = df.index[df[col] < lb].tolist()
-            if outlier_list is not None and len(outlier_list) > 0:
-                outlier_indexes[col].extend(df.index[df[col] < lb].tolist())
-        for (col, ub) in self.ub.items():
-            outlier_list = df.index[df[col] > ub].tolist()
-            if outlier_list is not None and len(outlier_list) > 0:
-                outlier_indexes[col].extend(df.index[df[col] > ub].tolist())
-        return outlier_indexes

@@ -29,11 +29,7 @@ from pyspark.sql.types import (
     StructType,
     TimestampType,
 )
-from sklearn.datasets import (
-    fetch_california_housing,
-    load_breast_cancer,
-    load_iris,
-)
+from sklearn.datasets import load_boston, load_breast_cancer, load_iris
 from tigerml.pyspark.core import dp
 from tigerml.pyspark.core.dp import (
     list_categorical_columns,
@@ -105,7 +101,7 @@ def get_ml_data(classification=True, multiclass=False):
         else:
             data_ = load_breast_cancer()
     else:
-        data_ = fetch_california_housing()
+        data_ = load_boston()
     X = pd.DataFrame(data_['data'], columns=data_['feature_names'])
     y = pd.DataFrame(data_['target'], columns=['label'])
     df = pd.concat([X, y], axis=1)

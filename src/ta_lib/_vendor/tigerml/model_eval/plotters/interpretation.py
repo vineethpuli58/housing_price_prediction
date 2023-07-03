@@ -833,7 +833,7 @@ class ModelInterpretation:
         #     self.set_errorbuckets_spec()
         x_cols = self.erroranalysis_cols
         X = self.x_train.copy()
-        X = X[x_cols].reset_index(drop=True)
+        X = X[x_cols]
         num_cols = get_num_cols(X)
         cat_cols = get_cat_cols(X)
         bool_cols = get_bool_cols(X)
@@ -841,10 +841,10 @@ class ModelInterpretation:
         if len(bool_cols) > 0:
             df = X[bool_cols].reset_index()
             df = df.set_index("index")
-            df_bool = df[df == 1].stack().reset_index().drop(0, axis=1)
+            df_bool = df[df == 1].stack().reset_index().drop(0, 1)
         else:
             df_bool = None
-        X["errorbucket_label"] = self.errorbucket_train.values
+        X["errorbucket_label"] = self.errorbucket_train
         if X["errorbucket_label"].isnull().sum() > 0:
             _LOGGER.warning(
                 "Residual Analysis: Ignoring {} observations in train data for error analysis where y=0".format(
@@ -856,14 +856,12 @@ class ModelInterpretation:
             ]
         if self.has_test:
             X_test = self.x_test.copy()
-            X_test = X_test[x_cols].reset_index(drop=True)
-            X_test["errorbucket_label"] = self.errorbucket_test.values
+            X_test = X_test[x_cols]
+            X_test["errorbucket_label"] = self.errorbucket_test
             if len(bool_cols) > 0:
                 df_test = X_test[bool_cols].reset_index()
                 df_test = df_test.set_index("index")
-                df_test_bool = (
-                    df_test[df_test == 1].stack().reset_index().drop(0, axis=1)
-                )
+                df_test_bool = df_test[df_test == 1].stack().reset_index().drop(0, 1)
             if X_test["errorbucket_label"].isnull().sum() > 0:
                 _LOGGER.warning(
                     "Residual Analysis: Ignoring {} observations in test data for error analysis where y=0".format(
@@ -1206,7 +1204,7 @@ class ModelInterpretation:
                 )
             else:
                 raise Exception(error_msg)
-        if len(shap_values) == 2 and self.algo == "classification":
+        if len(shap_values) == 2:
             shap_values = shap_values[1]
         elif len(shap_values) > 1 and len(shap_values) != len(X):
             _LOGGER.info("Shap values have a shape of {}".format(len(shap_values)))

@@ -134,7 +134,7 @@ class RegressionEvaluation(Evaluator):
             data = self.y_train
             pred_data = self.yhat_train
         y_test = data[:, np.newaxis]
-        slope, _, _, _ = np.linalg.lstsq(y_test, pred_data, rcond=-1)
+        slope, _, _, _ = np.linalg.lstsq(y_test, pred_data)
         min_y = data.min()
         max_y = data.max()
         y = [min_y, max_y]

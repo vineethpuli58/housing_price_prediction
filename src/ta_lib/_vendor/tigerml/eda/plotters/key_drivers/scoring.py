@@ -1,4 +1,3 @@
-import logging
 import matplotlib.pyplot as plt
 import pandas as pd
 from hvplot import hvPlot
@@ -8,8 +7,6 @@ from sklearn.feature_selection import (
     mutual_info_classif,
     mutual_info_regression,
 )
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class FeatureCorrelation:
@@ -49,16 +46,6 @@ class FeatureCorrelation:
         corr = corr.rename(
             columns=dict(zip(list(corr.columns), ["Pearson_correlation_with_Target"]))
         )
-        if corr["Pearson_correlation_with_Target"].isnull().sum() > 0:
-            removed_features = corr.index[
-                corr["Pearson_correlation_with_Target"].isnull()
-            ].tolist()
-            _LOGGER.warning(
-                "User Warning: Removed {} features {} whose pearson's correlation coefficient is nan".format(
-                    len(removed_features), removed_features
-                )
-            )
-            corr = corr.dropna(axis=0)
         corr.sort_values(by="Pearson_correlation_with_Target", inplace=True)
         return corr
 
